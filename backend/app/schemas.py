@@ -40,3 +40,18 @@ class JugadorResponse(BaseModel):
     correo: str
     correo_verificado: bool
     fecha_registro: datetime
+
+
+class LoginRequest(BaseModel):
+    """Datos para iniciar sesión (US-004). Se puede entrar con correo o con nombre de usuario."""
+
+    usuario_o_correo: str = Field(min_length=1)
+    contrasena: str = Field(min_length=1)
+
+
+class TokenResponse(BaseModel):
+    """Respuesta del login: el token que demuestra que el jugador inició sesión."""
+
+    access_token: str
+    token_type: str = "bearer"
+    jugador: JugadorResponse

@@ -22,3 +22,6 @@ class JugadorRepository:
         self.db.commit()
         self.db.refresh(jugador)  # trae el id y la fecha que puso la base de datos
         return jugador
+
+    def buscar_por_id(self, jugador_id: int) -> Jugador | None:
+        return self.db.get(Jugador, jugador_id)
