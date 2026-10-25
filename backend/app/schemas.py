@@ -55,3 +55,47 @@ class TokenResponse(BaseModel):
     access_token: str
     token_type: str = "bearer"
     jugador: JugadorResponse
+
+
+class FilaRanking(BaseModel):
+    """Una fila del ranking global (US-022)."""
+
+    posicion: int
+    nombre_usuario: str
+    puntos_totales: int
+    victorias: int
+    partidas_jugadas: int
+
+
+class PartidaEnHistorial(BaseModel):
+    """Una partida jugada, vista desde el perfil del jugador."""
+
+    partida_id: int
+    escenario: str
+    fecha: datetime | None
+    puntos: int
+    posicion: int | None
+
+
+class RecordResponse(BaseModel):
+    """Un récord del jugador, por ejemplo su mayor puntuación."""
+
+    model_config = ConfigDict(from_attributes=True)
+
+    tipo: str
+    valor: int
+    fecha: datetime
+
+
+class PerfilResponse(BaseModel):
+    """Perfil completo del jugador (US-006)."""
+
+    nombre_usuario: str
+    correo: str
+    fecha_registro: datetime
+    puntos_totales: int
+    victorias: int
+    partidas_jugadas: int
+    posicion_ranking: int
+    historial: list[PartidaEnHistorial]
+    records: list[RecordResponse]
