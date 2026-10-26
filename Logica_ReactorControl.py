@@ -1,9 +1,9 @@
 import pygame
 import sys
-import math #para los guardianes 
-import os #Para las imagenes 
-pygame.init()
+import math #para los guardianes
+import os #Para las imagenes
 
+pygame.init()
 
 #Prototipo de usuario jugador (no prestarle tanta atención por fis)
 
@@ -188,6 +188,7 @@ CARPETA_ASSETS = os.path.join(
     os.path.dirname(os.path.abspath(__file__)),
     "assets"
 )
+
 try:
     img_jugador = pygame.transform.scale(
         pygame.image.load(
@@ -229,8 +230,6 @@ try:
             os.path.join(CARPETA_ASSETS, "Reactor.png")
         ).convert_alpha(),
         (TAMANO_CELDA, TAMANO_CELDA)
-
-
     )
     USAR_IMAGENES = True
     print("Imagenes cargadas correctamente")
@@ -238,50 +237,6 @@ try:
 except (pygame.error,FileNotFoundError) as e: #En caso de que no funcione que no me estropee todo y siga con menor resolucion
     print("Advertencia: No se pudieron cargar las imagenes. Se usan colores planos:", e)
     USAR_IMAGENES = False
-###Imagenes de pantalla de victoria##
-try:
-    img_fondo_victoria = pygame.transform.scale(
-        pygame.image.load(
-            os.path.join(CARPETA_ASSETS, "Fondovitoria.png")
-        ).convert(),
-        (ANCHO_PANTALLA, ALTO_PANTALLA)
-    )
-
-    # Sprites de ganadores
-    img_azul_victoria = pygame.image.load(
-        os.path.join(CARPETA_ASSETS, "Azulvictoria.png")
-    ).convert_alpha()
-
-    img_naranja_victoria = pygame.image.load(
-        os.path.join(CARPETA_ASSETS, "Naranjavictoria.png")
-    ).convert_alpha()
-
-    img_verde_victoria = pygame.image.load(
-        os.path.join(CARPETA_ASSETS, "Verdevictoria.png")
-    ).convert_alpha()
-
-    # Sprites de derrotas
-    img_azul_derrota = pygame.image.load(
-        os.path.join(CARPETA_ASSETS, "Azulderrota.png")
-    ).convert_alpha()
-
-    img_naranja_derrota = pygame.image.load(
-        os.path.join(CARPETA_ASSETS, "Naranjaderrota.png")
-    ).convert_alpha()
-
-    img_verde_derrota = pygame.image.load(
-        os.path.join(CARPETA_ASSETS, "Verdederrota.png")
-    ).convert_alpha()
-
-    USAR_VICTORIA_VISUAL = True
-    print("Imagenes de victoria cargadas correctamente")
-
-except (pygame.error, FileNotFoundError) as e:
-    print("Error cargando imagenes de victoria:", e)
-    USAR_VICTORIA_VISUAL = False
-
-
-
 
 def cargar_Mapa(matriz):
     global reactor
@@ -346,6 +301,23 @@ def dibujar_mapa(superficie, matriz):
                 elif caracter == "R":
                     superficie.blit(img_reactor, celda_rect)
 
+            else:
+                #Si no cargan las imagenes entonces vuelvo a los rectagulos 
+                pygame.draw.rect(
+                    superficie, (35, 40, 55), celda_rect
+                )
+
+                if caracter == "#":
+                    pygame.draw.rect(superficie, GRIS, celda_rect)
+
+                elif caracter == "T":
+                    pygame.draw.rect(superficie, ROJO, celda_rect)
+
+                elif caracter == "R":
+                    pygame.draw.rect(
+                        superficie, (0, 220, 200), celda_rect
+                    )
+
 
             pygame.draw.rect(
                 superficie,
@@ -353,200 +325,97 @@ def dibujar_mapa(superficie, matriz):
                 celda_rect,
                 1
             ) #Bordecillo ahi para la cuadricula 
-    
+            # Piso de cada celda
+            pygame.draw.rect(
+                superficie,
+                (35, 40, 55),
+                (x, y, TAMANO_CELDA, TAMANO_CELDA)
+            )
+
+            if caracter == "#":
+                pygame.draw.rect(
+                    superficie,
+                    GRIS,
+                    (x, y, TAMANO_CELDA, TAMANO_CELDA)
+                )
+
+            elif caracter == "T":
+                pygame.draw.rect(
+                    superficie,
+                    ROJO,
+                    (x, y, TAMANO_CELDA, TAMANO_CELDA)
+                )
+
+            elif caracter == "R":
+                pygame.draw.rect(
+                    superficie,
+                    (0, 220, 200),
+                    (x, y, TAMANO_CELDA, TAMANO_CELDA)
+                )
+
+            # Bordes 
+            pygame.draw.rect(
+                superficie,
+                (65, 75, 90),
+                (x, y, TAMANO_CELDA, TAMANO_CELDA),
+                1
+            )
 
 
 cargar_Mapa(matriz_mapa)
 
 
-if not pygame.font.get_init():
-    pygame.font.init()
-def ceremonia_victoria(superficie,ganador,datos_jugadores):
-    if USAR_VICTORIA_VISUAL:
-        superficie.blit(img_fondo_victoria, (0, 0))
-    else:
-        superficie.fill((15, 20, 30))
-    #Esto es para centrar al ganador en el medio 
-    centro_x = ANCHO_PANTALLA // 2
-    centro_y = ALTO_PANTALLA // 2
-
-    if USAR_VICTORIA_VISUAL:
-        if ganador == "Azul":
-            superficie.blit(
-                pygame.transform.scale(img_naranja_derrota, (240, 360)),
-                (centro_x - 390, centro_y - 100)
-            )
-            superficie.blit(
-                pygame.transform.scale(img_verde_derrota, (240, 360)),
-                (centro_x + 150, centro_y - 100)
-            )
-            superficie.blit(
-                pygame.transform.scale(img_azul_victoria, (360, 480)),
-                (centro_x - 180, centro_y - 150)
-            )
-
-        elif ganador == "Naranja":
-            superficie.blit(
-                pygame.transform.scale(img_azul_derrota, (240, 360)),
-                (centro_x - 390, centro_y - 100)
-            )
-            superficie.blit(
-                pygame.transform.scale(img_verde_derrota, (240, 360)),
-                (centro_x + 150, centro_y - 100)
-            )
-            superficie.blit(
-                pygame.transform.scale(img_naranja_victoria, (360, 480)),
-                (centro_x - 180, centro_y - 150)
-            )
-
-        else:  #Gana el verde
-            superficie.blit(
-                pygame.transform.scale(img_azul_derrota, (240, 360)),
-                (centro_x - 390, centro_y - 100)
-            )
-            superficie.blit(
-                pygame.transform.scale(img_naranja_derrota, (240, 360)),
-                (centro_x + 150, centro_y - 100)
-            )
-            superficie.blit(
-                pygame.transform.scale(img_verde_victoria, (360, 480)),
-                (centro_x - 180, centro_y - 150)
-            )
-
-    #Estas son las barras de puntaje programadas
-    fuente_hud = pygame.font.SysFont("Arial", 20, bold=True)
-    ancho_barra = min(250, (ANCHO_PANTALLA - 80) // 3)
-    alto_barra = 35
-    separacion = (ANCHO_PANTALLA - 3 * ancho_barra) // 4
-    
-    #Se dibujan las 3 barras por jugador para ver los stats
-    rects_jugadores = []
-    for i, jg in enumerate(datos_jugadores):
-        pos_x = separacion + i * (ancho_barra + separacion)
-        pos_y = 30
-
-        rect_barra = pygame.Rect(pos_x, pos_y, ancho_barra, alto_barra)
-        rects_jugadores.append((rect_barra,jg))
-
-        #Con esto hago el color del fondo de la barra de stats
-        pygame.draw.rect(superficie, (40, 45, 60), rect_barra, border_radius=5)
-        pygame.draw.rect(superficie, (255, 215, 0), rect_barra, 2, border_radius=5) # Borde dorado arcade
-
-        #Texto con el nombre y los puntos 
-        texto_barra = fuente_hud.render(f"{jg['nombre']}: {jg['puntos']} pts", True, (255, 255, 255))
-        superficie.blit(texto_barra, (pos_x + 15, pos_y + 7))
-
-    pos_mouse = pygame.mouse.get_pos() #Este es el comando de Pygame para que cuando le ponga el cursos encima me diga especificaciones
-    for rect_barra, jg in rects_jugadores:
-        if rect_barra.collidepoint(pos_mouse):
-
-            #Dibujo las estadisticas flotantes 
-            tooltip_rect = pygame.Rect(pos_mouse[0], pos_mouse[1] + 15, 200, 100)
-            pygame.draw.rect(superficie, (10, 15, 25), tooltip_rect)
-            pygame.draw.rect(superficie, (0, 220, 200), tooltip_rect, 2)
-
-            fuente_tip = pygame.font.SysFont("Arial", 14)
-            t1 = fuente_tip.render(f"Jugador: {jg['nombre']}", True, (255, 255, 255))
-            t2 = fuente_tip.render(f"Energía Extraída: {jg.get('energia', 0)}", True, (200, 200, 200))
-            t3 = fuente_tip.render(f"Celdas Recogidas: {jg.get('celdas', 0)}", True, (200, 200, 200))
-            t4 = fuente_tip.render(f"Guardias Evitados: {jg.get('guardias', 0)}", True, (200, 200, 200))
-
-            superficie.blit(t1, (tooltip_rect.x + 10, tooltip_rect.y + 10))
-            superficie.blit(t2, (tooltip_rect.x + 10, tooltip_rect.y + 30))
-            superficie.blit(t3, (tooltip_rect.x + 10, tooltip_rect.y + 50))
-            superficie.blit(t4, (tooltip_rect.x + 10, tooltip_rect.y + 70))
-
 
 #Comando de pygame para setear un timer 
 reloj = pygame.time.Clock()
-
-
-#####A PARTIR DE ESTE MOMENTO ES LO DE LA CEREMONIA DE VICTORIA####
-
-estado_juego = "JUGANDO"
-
-datos_jugadores_ejemplo = [
-    {"nombre": "AZUL", "puntos": 1250, "energia": 800,
-    "celdas": 5, "guardias": 2},
-    {"nombre": "NARANJA", "puntos": 980, "energia": 600,
-    "celdas": 3, "guardias": 1},
-    {"nombre": "VERDE", "puntos": 750, "energia": 450,
-    "celdas": 2, "guardias": 0}
-]
-
-ganador_partida = "Azul"
-
-reloj = pygame.time.Clock()
-    
+#prueba de la logica
 while True:
-    #Esto me permite procesar los elementos una vez 
+    ventana.fill((20,25,35))
+    
+    # Manejo de eventos
     for evento in pygame.event.get():
-
         if evento.type == pygame.QUIT:
             pygame.quit()
             sys.exit()
+    teclas = pygame.key.get_pressed()
+    dibujar_mapa(ventana,matriz_mapa)
 
-        if evento.type == pygame.KEYDOWN:
+    #Verificar si el jugador esta pisando una trampa 
+    en_trampa = False
+    for obs in obstaculos:
+        if obs.tipo == "trampa" and jugador.rect.colliderect(obs.rect):
+            en_trampa = True
+            break 
+    #Si esta en la trampa le reduce velocidad, si no nada pasa
+    if en_trampa:
+        jugador.velocidad_actual = 2 #reducido en dos
+    else:
+        jugador.velocidad_actual = jugador.velocidad_base
+    
+    jugador.Mover(teclas, obstaculos)
 
-            if evento.key == pygame.K_ESCAPE:
-                pygame.quit()
-                sys.exit()
+    for guardian in guardianes:
+        guardian.actualizar(jugador)
+        guardian.dibujar(ventana)
 
-            #V alterna entre el mapa y la ceremonia
-            elif evento.key == pygame.K_v:
-                if estado_juego == "JUGANDO":
-                    estado_juego = "VICTORIA"
-                else:
-                    estado_juego = "JUGANDO"
+    #Dibujar onstaculos
+    for obs in obstaculos:
+        obs.dibujar (ventana)
+    jugador.dibujar(ventana)
+    
 
-    #OJO, Segun el estado es Jugando o Victoria alterno la pantalla
-    if estado_juego == "JUGANDO":
 
-        ventana.fill((20, 25, 35))
-
-        teclas = pygame.key.get_pressed()
-
-        dibujar_mapa(ventana, matriz_mapa)
- #Logica normal
-        #Detectar si el jugador está en una trampa
-        en_trampa = any(
-            obs.tipo == "trampa"
-            and jugador.rect.colliderect(obs.rect)
-            for obs in obstaculos
-        )
-
-        if en_trampa:
-            jugador.velocidad_actual = 2
-        else:
-            jugador.velocidad_actual = jugador.velocidad_base
-
-        #Actualizar al jugador
-        jugador.Mover(teclas, obstaculos)
-
-        #Actualizar y dibujar guardianes
-        for guardian in guardianes:
-            guardian.actualizar(jugador)
-            guardian.dibujar(ventana)
-
-        #Dibujar obstáculos
-        for obs in obstaculos:
-            obs.dibujar(ventana)
-
-        #Dibujar jugador al final para que quede visible
-        jugador.dibujar(ventana)
-
-    elif estado_juego == "VICTORIA":
-
-        ceremonia_victoria(
-            ventana,
-            ganador_partida,
-            datos_jugadores_ejemplo
-        )
-
-    #Aqui actualizo la pantalla
     pygame.display.flip()
     reloj.tick(60)
 
 
-     
+
+
+
+
+
+
+        
+
+
 
