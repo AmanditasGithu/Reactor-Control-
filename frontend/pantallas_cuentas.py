@@ -1,4 +1,4 @@
-"""Pantallas de inicio de sesión (US-004) y registro (US-001) en Pygame.
+"""Pantallas de inicio de sesión (US-004), registro (US-001) y recuperar contraseña (US-005).
 
 Uso desde el juego:
     cliente, jugador = ejecutar_pantallas_cuentas(ventana)
@@ -103,7 +103,8 @@ class PantallaLogin(Pantalla):
         self.campos = [self.campo_usuario, self.campo_contrasena]
         self.boton_entrar = Boton(self.x, y + 175, ANCHO_PANEL, "Entrar")
         self.boton_registro = Boton(self.x, y + 233, ANCHO_PANEL, "Crear una cuenta", principal=False)
-        self.botones = [self.boton_entrar, self.boton_registro]
+        self.boton_olvide = Boton(self.x, y + 291, ANCHO_PANEL, "Olvidé mi contraseña", principal=False)
+        self.botones = [self.boton_entrar, self.boton_registro, self.boton_olvide]
         self.campo_usuario.activo = True
 
     def revisar_botones(self, evento):
@@ -111,6 +112,8 @@ class PantallaLogin(Pantalla):
             return self.enviar()
         if self.boton_registro.fue_presionado(evento):
             return ("ir_a_registro", None)
+        if self.boton_olvide.fue_presionado(evento):
+            return ("ir_a_recuperar", None)
         return None
 
     def enviar(self):
@@ -173,6 +176,84 @@ class PantallaRegistro(Pantalla):
         return ("cuenta_creada", jugador)
 
 
+class PantallaPedirCodigo(Pantalla):
+    """US-005 paso 1: el jugador escribe su correo y recibe un código."""
+
+    titulo = "Recuperar contraseña"
+
+    def __init__(self, ventana, cliente):
+        super().__init__(ventana, cliente)
+        y = self.y_inicio + 110
+        self.campo_correo = CampoTexto(self.x, y, ANCHO_PANEL, "Correo de tu cuenta")
+        self.campos = [self.campo_correo]
+        self.boton_enviar = Boton(self.x, y + 100, ANCHO_PANEL, "Enviar código")
+        self.boton_volver = Boton(self.x, y + 158, ANCHO_PANEL, "Volver", principal=False)
+        self.botones = [self.boton_enviar, self.boton_volver]
+        self.campo_correo.activo = True
+
+    def revisar_botones(self, evento):
+        if self.boton_enviar.fue_presionado(evento):
+            return self.enviar()
+        if self.boton_volver.fue_presionado(evento):
+            return ("ir_a_login", None)
+        return None
+
+    def enviar(self):
+        correo = self.campo_correo.texto.strip()
+        if not correo:
+            self.mostrar_error("Escribí tu correo")
+            return None
+        try:
+            self.cliente.solicitar_recuperacion(correo)
+        except ErrorAPI as error:
+            self.mostrar_error(error.mensaje)
+            return None
+        return ("codigo_enviado", correo)
+
+
+class PantallaNuevaContrasena(Pantalla):
+    """US-005 paso 2: el jugador escribe el código y su contraseña nueva."""
+
+    titulo = "Nueva contraseña"
+
+    def __init__(self, ventana, cliente, correo: str):
+        super().__init__(ventana, cliente)
+        self.correo = correo
+        self.y_inicio -= 30
+        y = self.y_inicio + 110
+        self.campo_codigo = CampoTexto(self.x, y, ANCHO_PANEL, "Código de 6 números", largo_maximo=6)
+        self.campo_contrasena = CampoTexto(self.x, y + 75, ANCHO_PANEL, "Contraseña nueva (mínimo 8)", oculto=True)
+        self.campo_confirmar = CampoTexto(self.x, y + 150, ANCHO_PANEL, "Confirmar contraseña", oculto=True)
+        self.campos = [self.campo_codigo, self.campo_contrasena, self.campo_confirmar]
+        self.boton_cambiar = Boton(self.x, y + 250, ANCHO_PANEL, "Cambiar contraseña")
+        self.boton_volver = Boton(self.x, y + 308, ANCHO_PANEL, "Volver", principal=False)
+        self.botones = [self.boton_cambiar, self.boton_volver]
+        self.campo_codigo.activo = True
+
+    def revisar_botones(self, evento):
+        if self.boton_cambiar.fue_presionado(evento):
+            return self.enviar()
+        if self.boton_volver.fue_presionado(evento):
+            return ("ir_a_login", None)
+        return None
+
+    def enviar(self):
+        if not all(campo.texto.strip() for campo in self.campos):
+            self.mostrar_error("Completá todos los campos")
+            return None
+        if self.campo_contrasena.texto != self.campo_confirmar.texto:
+            self.mostrar_error("Las contraseñas no coinciden")
+            return None
+        try:
+            self.cliente.restablecer_contrasena(
+                self.correo, self.campo_codigo.texto.strip(), self.campo_contrasena.texto
+            )
+        except ErrorAPI as error:
+            self.mostrar_error(error.mensaje)
+            return None
+        return ("contrasena_cambiada", self.correo)
+
+
 def ejecutar_pantallas_cuentas(ventana, cliente: ClienteAPI | None = None):
     """Muestra login y registro hasta que el jugador inicia sesión.
 
@@ -193,19 +274,30 @@ def ejecutar_pantallas_cuentas(ventana, cliente: ClienteAPI | None = None):
             accion = pantalla.manejar_evento(evento)
             if accion is None:
                 continue
-            tipo, jugador = accion
+            tipo, dato = accion  # dato: el jugador, el correo o None, según la acción
             if tipo == "ir_a_registro":
                 pantalla = PantallaRegistro(ventana, cliente)
             elif tipo == "ir_a_login":
                 pantalla = PantallaLogin(ventana, cliente)
             elif tipo == "cuenta_creada":
                 pantalla = PantallaLogin(ventana, cliente)
-                pantalla.campo_usuario.texto = jugador["nombre_usuario"]
+                pantalla.campo_usuario.texto = dato["nombre_usuario"]
                 pantalla.campo_usuario.activo = False
                 pantalla.campo_contrasena.activo = True
                 pantalla.mostrar_exito("¡Cuenta creada! Ahora iniciá sesión")
+            elif tipo == "ir_a_recuperar":
+                pantalla = PantallaPedirCodigo(ventana, cliente)
+            elif tipo == "codigo_enviado":
+                pantalla = PantallaNuevaContrasena(ventana, cliente, dato)
+                pantalla.mostrar_exito("Si el correo está registrado, te llegó un código")
+            elif tipo == "contrasena_cambiada":
+                pantalla = PantallaLogin(ventana, cliente)
+                pantalla.campo_usuario.texto = dato
+                pantalla.campo_usuario.activo = False
+                pantalla.campo_contrasena.activo = True
+                pantalla.mostrar_exito("Contraseña cambiada. Iniciá sesión")
             elif tipo == "sesion_iniciada":
-                return cliente, jugador
+                return cliente, dato
 
         pantalla.dibujar()
         pygame.display.flip()
