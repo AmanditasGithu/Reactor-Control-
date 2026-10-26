@@ -1,9 +1,9 @@
 import pygame
 import sys
-import math #para los guardianes 
-import os #Para las imagenes 
- 
+import math #para los guardianes
+import os #Para las imagenes
 
+pygame.init()
 
 #Prototipo de usuario jugador (no prestarle tanta atención por fis)
 
