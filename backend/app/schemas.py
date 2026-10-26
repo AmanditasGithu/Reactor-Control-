@@ -99,3 +99,40 @@ class PerfilResponse(BaseModel):
     posicion_ranking: int
     historial: list[PartidaEnHistorial]
     records: list[RecordResponse]
+
+
+class SolicitarRecuperacionRequest(BaseModel):
+    """US-005, paso 1: el jugador escribe su correo para recibir un código."""
+
+    correo: EmailStr
+
+    @field_validator("correo")
+    @classmethod
+    def correo_en_minusculas(cls, valor: str) -> str:
+        return valor.lower()
+
+
+class RestablecerContrasenaRequest(BaseModel):
+    """US-005, paso 2: el jugador escribe el código y su contraseña nueva."""
+
+    correo: EmailStr
+    codigo: str = Field(pattern=r"^\d{6}$")
+    contrasena_nueva: str = Field(min_length=8)
+
+    @field_validator("correo")
+    @classmethod
+    def correo_en_minusculas(cls, valor: str) -> str:
+        return valor.lower()
+
+    @field_validator("contrasena_nueva")
+    @classmethod
+    def contrasena_no_muy_larga(cls, valor: str) -> str:
+        if len(valor.encode("utf-8")) > 72:
+            raise ValueError("La contraseña es demasiado larga (máximo 72 caracteres)")
+        return valor
+
+
+class MensajeResponse(BaseModel):
+    """Respuesta que solo trae un mensaje para mostrar al jugador."""
+
+    mensaje: str

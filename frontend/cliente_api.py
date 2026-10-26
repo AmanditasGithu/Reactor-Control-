@@ -26,6 +26,8 @@ MENSAJES_CAMPOS = {
     "correo": "Escribí un correo válido (ejemplo: ana@correo.com)",
     "contrasena": "La contraseña debe tener al menos 8 caracteres",
     "usuario_o_correo": "Escribí tu usuario o correo",
+    "codigo": "El código son 6 números",
+    "contrasena_nueva": "La contraseña nueva debe tener al menos 8 caracteres",
 }
 
 
@@ -82,6 +84,18 @@ class ClienteAPI:
         )
         self.token = respuesta["access_token"]
         return respuesta["jugador"]
+
+    def solicitar_recuperacion(self, correo: str) -> dict:
+        """US-005 paso 1: pide que le envíen un código al correo."""
+        return self._enviar("POST", "/api/auth/recuperar/solicitar", {"correo": correo})
+
+    def restablecer_contrasena(self, correo: str, codigo: str, contrasena_nueva: str) -> dict:
+        """US-005 paso 2: cambia la contraseña con el código recibido."""
+        return self._enviar(
+            "POST",
+            "/api/auth/recuperar/restablecer",
+            {"correo": correo, "codigo": codigo, "contrasena_nueva": contrasena_nueva},
+        )
 
     def obtener_perfil(self) -> dict:
         """US-006: perfil del jugador con sesión iniciada (necesita haber iniciado sesión)."""
