@@ -9,6 +9,8 @@ frontend/
 ├── cliente_api.py        ← habla con el backend (registro, login)
 ├── componentes.py        ← colores, campos de texto y botones
 ├── pantallas_cuentas.py  ← pantallas de login (US-004) y registro (US-001)
+├── pantallas_menu.py     ← menú principal, perfil (US-006) y ranking (US-022)
+├── juego.py              ← punto de entrada: login → menú → arena
 └── tests/                ← pruebas automáticas
 ```
 
@@ -25,7 +27,7 @@ Si antes instalaste `pygame` (no `-ce`), quitalo primero: `pip uninstall pygame`
 ## Probar las pantallas
 
 1. Encender el backend en una terminal (ver `backend/README.md`).
-2. En otra terminal, desde `frontend`: `python pantallas_cuentas.py`
+2. En otra terminal, desde `frontend`: `python juego.py`
 
 ## Usarlas desde el juego
 
@@ -36,6 +38,11 @@ cliente, jugador = ejecutar_pantallas_cuentas(ventana)
 # jugador["nombre_usuario"] -> quién inició sesión
 # cliente.token             -> pase de sesión para el backend
 ```
+
+## Conectar la arena
+
+En `juego.py`, la función `iniciar_partida(ventana, cliente, jugador)` es una pantalla provisional.
+Se reemplaza por la que arranca la partida (US-007). Al terminar la partida, vuelve al menú.
 
 ## Pruebas
 
