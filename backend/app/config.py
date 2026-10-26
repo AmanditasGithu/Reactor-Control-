@@ -17,3 +17,8 @@ DATABASE_URL = os.getenv(
 JWT_SECRET = os.getenv("JWT_SECRET", "clave-solo-para-desarrollo-cambiar-en-produccion")
 JWT_ALGORITMO = "HS256"
 JWT_MINUTOS_EXPIRACION = int(os.getenv("JWT_MINUTOS_EXPIRACION", "60"))
+
+# Verificación de correo (US-003).
+# Si vale "1", el jugador no puede iniciar sesión hasta verificar su correo.
+# Por defecto está apagado, para que las cuentas de prueba del equipo sigan entrando.
+EXIGIR_CORREO_VERIFICADO = os.getenv("EXIGIR_CORREO_VERIFICADO", "0") == "1"

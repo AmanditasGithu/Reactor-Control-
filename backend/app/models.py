@@ -126,3 +126,20 @@ class CodigoRecuperacion(Base):
     usado: Mapped[bool] = mapped_column(Boolean, default=False)
     intentos: Mapped[int] = mapped_column(Integer, default=0)  # intentos fallidos
     fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=ahora)
+
+
+class CodigoVerificacion(Base):
+    """Código de 6 números para verificar el correo al registrarse (US-003).
+
+    Se guarda cifrado, vence a las 24 horas y sirve una sola vez.
+    """
+
+    __tablename__ = "codigos_verificacion"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    jugador_id: Mapped[int] = mapped_column(ForeignKey("jugadores.id"))
+    codigo_hash: Mapped[str] = mapped_column(String(64))
+    vence: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    usado: Mapped[bool] = mapped_column(Boolean, default=False)
+    intentos: Mapped[int] = mapped_column(Integer, default=0)  # intentos fallidos
+    fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=ahora)

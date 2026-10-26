@@ -1,4 +1,5 @@
 """Lógica de las cuentas de jugador: registro (US-001) e inicio de sesión (US-004)."""
+from app import config
 from app.models import Jugador
 from app.repositories.jugador_repository import JugadorRepository
 from app.schemas import LoginRequest, RegistroRequest
@@ -15,6 +16,10 @@ class NombreUsuarioYaRegistrado(Exception):
 
 class CredencialesInvalidas(Exception):
     """US-004: el usuario no existe o la contraseña no coincide."""
+
+
+class CorreoNoVerificado(Exception):
+    """US-003: el jugador todavía no verificó su correo (solo si está activada la regla)."""
 
 
 class AuthService:
@@ -51,5 +56,7 @@ class AuthService:
             raise CredencialesInvalidas()
         if not verificar_contrasena(datos.contrasena, jugador.contrasena_hash):
             raise CredencialesInvalidas()
+        if config.EXIGIR_CORREO_VERIFICADO and not jugador.correo_verificado:
+            raise CorreoNoVerificado()
 
         return jugador, crear_token(jugador.id)
