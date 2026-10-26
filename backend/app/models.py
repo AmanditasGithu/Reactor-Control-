@@ -109,3 +109,20 @@ class Record(Base):
     fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=ahora)
 
     jugador: Mapped[Jugador] = relationship(back_populates="records")
+
+
+class CodigoRecuperacion(Base):
+    """Código de 6 números para recuperar la contraseña (US-005).
+
+    Se guarda cifrado, vence a los 15 minutos y sirve una sola vez.
+    """
+
+    __tablename__ = "codigos_recuperacion"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    jugador_id: Mapped[int] = mapped_column(ForeignKey("jugadores.id"))
+    codigo_hash: Mapped[str] = mapped_column(String(64))
+    vence: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    usado: Mapped[bool] = mapped_column(Boolean, default=False)
+    intentos: Mapped[int] = mapped_column(Integer, default=0)  # intentos fallidos
+    fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=ahora)

@@ -1,4 +1,6 @@
 """Cifrado de contraseñas (RNF-04) y tokens de sesión (RNF-07)."""
+import hashlib
+import secrets
 from datetime import datetime, timedelta, timezone
 
 import bcrypt
@@ -31,3 +33,13 @@ def leer_token(token: str) -> int | None:
         return int(datos["sub"])
     except (jwt.PyJWTError, KeyError, ValueError):
         return None
+
+
+def generar_codigo() -> str:
+    """Crea un código al azar de 6 números para recuperar la contraseña (US-005)."""
+    return f"{secrets.randbelow(1_000_000):06d}"
+
+
+def cifrar_codigo(codigo: str) -> str:
+    """Cifra el código antes de guardarlo, igual que se hace con las contraseñas."""
+    return hashlib.sha256(codigo.encode("utf-8")).hexdigest()
