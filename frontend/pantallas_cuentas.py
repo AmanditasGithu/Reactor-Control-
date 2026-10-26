@@ -1,4 +1,5 @@
-"""Pantallas de inicio de sesión (US-004), registro (US-001) y recuperar contraseña (US-005).
+"""Pantallas de cuentas: login (US-004), registro (US-001), verificar correo (US-003)
+y recuperar contraseña (US-005).
 
 Uso desde el juego:
     cliente, jugador = ejecutar_pantallas_cuentas(ventana)
@@ -125,6 +126,8 @@ class PantallaLogin(Pantalla):
         try:
             jugador = self.cliente.iniciar_sesion(usuario, contrasena)
         except ErrorAPI as error:
+            if error.codigo == 403:  # US-003: falta verificar el correo
+                return ("ir_a_verificar", usuario if "@" in usuario else "")
             self.mostrar_error(error.mensaje)
             self.campo_contrasena.texto = ""
             return None
@@ -174,6 +177,63 @@ class PantallaRegistro(Pantalla):
             self.mostrar_error(error.mensaje)
             return None
         return ("cuenta_creada", jugador)
+
+
+class PantallaVerificarCorreo(Pantalla):
+    """US-003: el jugador escribe el código que le llegó al registrarse."""
+
+    titulo = "Verificar correo"
+
+    def __init__(self, ventana, cliente, correo: str = ""):
+        super().__init__(ventana, cliente)
+        self.y_inicio -= 30
+        y = self.y_inicio + 110
+        self.campo_correo = CampoTexto(self.x, y, ANCHO_PANEL, "Correo")
+        self.campo_codigo = CampoTexto(self.x, y + 75, ANCHO_PANEL, "Código de 6 números", largo_maximo=6)
+        self.campos = [self.campo_correo, self.campo_codigo]
+        self.boton_verificar = Boton(self.x, y + 175, ANCHO_PANEL, "Verificar")
+        self.boton_reenviar = Boton(self.x, y + 233, ANCHO_PANEL, "Reenviar código", principal=False)
+        self.boton_despues = Boton(self.x, y + 291, ANCHO_PANEL, "Más tarde", principal=False)
+        self.botones = [self.boton_verificar, self.boton_reenviar, self.boton_despues]
+        self.campo_correo.texto = correo
+        # El cursor empieza en el código si el correo ya viene escrito
+        (self.campo_codigo if correo else self.campo_correo).activo = True
+
+    def revisar_botones(self, evento):
+        if self.boton_verificar.fue_presionado(evento):
+            return self.enviar()
+        if self.boton_reenviar.fue_presionado(evento):
+            return self.reenviar()
+        if self.boton_despues.fue_presionado(evento):
+            return ("ir_a_login", None)
+        return None
+
+    def enviar(self):
+        correo = self.campo_correo.texto.strip()
+        codigo = self.campo_codigo.texto.strip()
+        if not correo or not codigo:
+            self.mostrar_error("Completá todos los campos")
+            return None
+        try:
+            self.cliente.verificar_correo(correo, codigo)
+        except ErrorAPI as error:
+            self.mostrar_error(error.mensaje)
+            return None
+        return ("correo_verificado", correo)
+
+    def reenviar(self):
+        correo = self.campo_correo.texto.strip()
+        if not correo:
+            self.mostrar_error("Escribí tu correo")
+            return None
+        try:
+            self.cliente.reenviar_verificacion(correo)
+        except ErrorAPI as error:
+            self.mostrar_error(error.mensaje)
+            return None
+        self.campo_codigo.texto = ""
+        self.mostrar_exito("Te enviamos un código nuevo")
+        return None
 
 
 class PantallaPedirCodigo(Pantalla):
@@ -280,11 +340,17 @@ def ejecutar_pantallas_cuentas(ventana, cliente: ClienteAPI | None = None):
             elif tipo == "ir_a_login":
                 pantalla = PantallaLogin(ventana, cliente)
             elif tipo == "cuenta_creada":
+                pantalla = PantallaVerificarCorreo(ventana, cliente, dato["correo"])
+                pantalla.mostrar_exito("¡Cuenta creada! Te enviamos un código a tu correo")
+            elif tipo == "ir_a_verificar":
+                pantalla = PantallaVerificarCorreo(ventana, cliente, dato)
+                pantalla.mostrar_error("Verificá tu correo antes de iniciar sesión")
+            elif tipo == "correo_verificado":
                 pantalla = PantallaLogin(ventana, cliente)
-                pantalla.campo_usuario.texto = dato["nombre_usuario"]
+                pantalla.campo_usuario.texto = dato
                 pantalla.campo_usuario.activo = False
                 pantalla.campo_contrasena.activo = True
-                pantalla.mostrar_exito("¡Cuenta creada! Ahora iniciá sesión")
+                pantalla.mostrar_exito("¡Correo verificado! Ahora iniciá sesión")
             elif tipo == "ir_a_recuperar":
                 pantalla = PantallaPedirCodigo(ventana, cliente)
             elif tipo == "codigo_enviado":

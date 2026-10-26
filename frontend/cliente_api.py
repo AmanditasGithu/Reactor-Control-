@@ -97,6 +97,14 @@ class ClienteAPI:
             {"correo": correo, "codigo": codigo, "contrasena_nueva": contrasena_nueva},
         )
 
+    def verificar_correo(self, correo: str, codigo: str) -> dict:
+        """US-003: marca el correo como verificado con el código recibido."""
+        return self._enviar("POST", "/api/auth/verificar", {"correo": correo, "codigo": codigo})
+
+    def reenviar_verificacion(self, correo: str) -> dict:
+        """US-003: pide otro código de verificación."""
+        return self._enviar("POST", "/api/auth/verificar/reenviar", {"correo": correo})
+
     def obtener_perfil(self) -> dict:
         """US-006: perfil del jugador con sesión iniciada (necesita haber iniciado sesión)."""
         return self._enviar("GET", "/api/perfil")

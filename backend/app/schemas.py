@@ -136,3 +136,26 @@ class MensajeResponse(BaseModel):
     """Respuesta que solo trae un mensaje para mostrar al jugador."""
 
     mensaje: str
+
+
+class VerificarCorreoRequest(BaseModel):
+    """US-003: el jugador escribe su correo y el código que le llegó."""
+
+    correo: EmailStr
+    codigo: str = Field(pattern=r"^\d{6}$")
+
+    @field_validator("correo")
+    @classmethod
+    def correo_en_minusculas(cls, valor: str) -> str:
+        return valor.lower()
+
+
+class ReenviarCodigoRequest(BaseModel):
+    """US-003: pedir otro código de verificación."""
+
+    correo: EmailStr
+
+    @field_validator("correo")
+    @classmethod
+    def correo_en_minusculas(cls, valor: str) -> str:
+        return valor.lower()
