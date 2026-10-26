@@ -27,3 +27,6 @@ steps:
 - script: |
     python -m py_compile Logica_ReactorControl.py
   displayName: 'Verificar sintaxis y compilación del código'
+  
+  
+  #Actualización para ver si funciona 
