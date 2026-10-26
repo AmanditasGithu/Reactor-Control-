@@ -7,7 +7,7 @@ from typing import Literal
 from fastapi import APIRouter, Header, HTTPException
 from pydantic import BaseModel
 
-from Servicios.EstadoServidor import gestor, conexiones
+from servicios.EstadoServidor import gestor, conexiones
 
 router = APIRouter(
     prefix="/hardware",
