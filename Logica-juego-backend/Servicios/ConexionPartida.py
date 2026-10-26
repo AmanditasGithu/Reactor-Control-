@@ -43,7 +43,7 @@ class ConexionPartida:
             if conexion is None:
                 return
 
-            if conexion["Websocket"] is websocket:
+            if conexion["websocket"] is websocket:
                 del jugadores[id_jugador]
 
                 if not jugadores:

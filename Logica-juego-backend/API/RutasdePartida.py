@@ -69,7 +69,7 @@ def unir_jugador(id_partida: int, datos: DatosJugador):
         )
 
     jugador = Jugador(
-        datos.id_jugador
+        datos.id_jugador,
         datos.nombre
     )
 

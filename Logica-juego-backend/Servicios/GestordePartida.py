@@ -2,8 +2,7 @@ import time
 import math
 
 from threading import RLock
-#from modelos.Partida#
-import Partida
+from modelos.Partida import Partida
 
 class GestordePartida:
     TIEMPO_MAX_SIN_LATIDO = 1.5
@@ -12,6 +11,7 @@ class GestordePartida:
         self.partidas = {}
         self.siguiente_id = 1
         self.bloqueo = RLock()
+        self._eventos_finalizacion = []
     
     def crear_partida(self):
         with self.bloqueo:
@@ -191,11 +191,11 @@ class GestordePartida:
             if reactor.energia_actual == 0:
                 jugador.extrayendo = False
                 self._verificar_fin(partida, ahora)
-                return {
-                    'ok': True,
-                    'cambio': True,
-                    'mensaje': f'Extraídas {cantidad} unidades de energía',
-                }
+            return {
+                'ok': True,
+                'cambio': True,
+                'mensaje': f'Extraídas {cantidad} unidades de energía',
+            }
 
     def procesar_extracciones(self):
         cambios = []
