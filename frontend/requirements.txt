@@ -2,5 +2,8 @@
 # y, a diferencia de pygame, tiene instalador para Python 3.14 y 3.15.
 pygame-ce==2.5.8
 
+# Control físico (Arduino): lo usa Logica_ReactorControl.py
+pyserial==3.5
+
 # Pruebas
 pytest==9.1.1
