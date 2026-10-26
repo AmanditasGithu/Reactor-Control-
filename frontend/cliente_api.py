@@ -82,3 +82,15 @@ class ClienteAPI:
         )
         self.token = respuesta["access_token"]
         return respuesta["jugador"]
+
+    def obtener_perfil(self) -> dict:
+        """US-006: perfil del jugador con sesión iniciada (necesita haber iniciado sesión)."""
+        return self._enviar("GET", "/api/perfil")
+
+    def obtener_ranking(self, limite: int = 10) -> list[dict]:
+        """US-022: top de jugadores por puntos."""
+        return self._enviar("GET", f"/api/ranking?limite={limite}")
+
+    def cerrar_sesion(self) -> None:
+        """Olvida el token. El jugador tiene que volver a iniciar sesión."""
+        self.token = None
