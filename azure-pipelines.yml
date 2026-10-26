@@ -1,0 +1,29 @@
+# Starter pipeline
+# Start with a minimal pipeline that you can customize to build and deploy your code.
+# Add steps that build, run tests, deploy, and more:
+# https://aka.ms/yaml
+
+trigger:
+  branches:
+    include:
+      - develop
+      - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '3.10'
+    addToPath: true
+  displayName: 'Configurar versión de Python'
+
+- script: |
+    python -m pip install --upgrade pip
+    pip install pygame
+  displayName: 'Instalar dependencias del juego'
+
+- script: |
+    python -m py_compile Logica_ReactorControl.py
+  displayName: 'Verificar sintaxis y compilación del código'
