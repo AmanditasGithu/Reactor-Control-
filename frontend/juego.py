@@ -1,7 +1,11 @@
-"""Punto de entrada del juego: login → menú → arena.
+"""Punto de entrada del juego: login → menú → arena (Logica_ReactorControl.py).
 
 Para probar:  python juego.py   (con el backend encendido)
 """
+import subprocess
+import sys
+from pathlib import Path
+
 import pygame
 
 from cliente_api import ClienteAPI
@@ -10,13 +14,31 @@ from pantallas_cuentas import ejecutar_pantallas_cuentas
 from pantallas_menu import ejecutar_menu
 
 
-def iniciar_partida(ventana, cliente: ClienteAPI, jugador: dict) -> None:
-    """AQUÍ SE CONECTA LA ARENA (US-007).
+# El juego de la arena (mapa, guardianes y ceremonia) está en la carpeta principal del repo
+RUTA_JUEGO = Path(__file__).resolve().parent.parent / "Logica_ReactorControl.py"
 
-    Reemplazar esta pantalla provisional por la función que arranca la partida.
-    `cliente.token` sirve para hablar con el backend como este jugador.
+
+def iniciar_partida(ventana, cliente: ClienteAPI, jugador: dict):
+    """Abre el juego de la arena y, al cerrarlo (ESC), vuelve al menú.
+
+    Por ahora el juego corre como un programa aparte. Devuelve la ventana del menú,
+    porque se vuelve a crear al regresar.
     """
-    fuente = pygame.font.SysFont("Arial", 28, bold=True)
+    if not RUTA_JUEGO.exists():
+        mostrar_aviso(ventana, "No se encontró Logica_ReactorControl.py")
+        return ventana
+
+    tamano = ventana.get_size()
+    pygame.display.iconify()  # minimiza el menú mientras se juega
+    subprocess.run([sys.executable, str(RUTA_JUEGO)], cwd=RUTA_JUEGO.parent)
+    ventana = pygame.display.set_mode(tamano)  # vuelve a mostrar el menú
+    pygame.event.clear()  # descarta las teclas presionadas durante el juego
+    return ventana
+
+
+def mostrar_aviso(ventana, mensaje: str) -> None:
+    """Pantalla de aviso; cualquier tecla vuelve al menú."""
+    fuente = pygame.font.SysFont("Arial", 24, bold=True)
     chica = pygame.font.SysFont("Arial", 18)
     centro = ventana.get_width() // 2, ventana.get_height() // 2
     while True:
@@ -26,7 +48,7 @@ def iniciar_partida(ventana, cliente: ClienteAPI, jugador: dict) -> None:
             if evento.type == pygame.KEYDOWN:
                 return
         ventana.fill(FONDO)
-        texto = fuente.render(f"Aquí empieza la arena, {jugador['nombre_usuario']}", True, DORADO)
+        texto = fuente.render(mensaje, True, DORADO)
         ventana.blit(texto, texto.get_rect(center=centro))
         ayuda = chica.render("Presioná cualquier tecla para volver al menú", True, GRIS)
         ventana.blit(ayuda, ayuda.get_rect(center=(centro[0], centro[1] + 45)))
@@ -42,7 +64,7 @@ def main() -> None:
     while True:
         cliente, jugador = ejecutar_pantallas_cuentas(ventana, cliente)
         while ejecutar_menu(ventana, cliente, jugador) == "jugar":
-            iniciar_partida(ventana, cliente, jugador)
+            ventana = iniciar_partida(ventana, cliente, jugador)
         # Si cerró sesión, vuelve al login
 
 
