@@ -159,3 +159,26 @@ class ReenviarCodigoRequest(BaseModel):
     @classmethod
     def correo_en_minusculas(cls, valor: str) -> str:
         return valor.lower()
+
+
+class InicioSocialResponse(BaseModel):
+    """US-002 paso 1: la página que el juego abre en el navegador y el código para esperar."""
+
+    url: str
+    codigo_espera: str
+
+
+class RevisarSocialRequest(BaseModel):
+    """US-002 paso 4: el juego pregunta si el jugador ya terminó en el navegador."""
+
+    codigo_espera: str = Field(min_length=10, max_length=100)
+
+
+class EstadoSocialResponse(BaseModel):
+    """US-002: "pendiente" (seguir esperando), "listo" (trae el token) o "error"."""
+
+    estado: str
+    mensaje: str | None = None
+    access_token: str | None = None
+    token_type: str = "bearer"
+    jugador: JugadorResponse | None = None

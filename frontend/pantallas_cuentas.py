@@ -1,5 +1,5 @@
-"""Pantallas de cuentas: login (US-004), registro (US-001), verificar correo (US-003)
-y recuperar contraseña (US-005).
+"""Pantallas de cuentas: login (US-004), login con Google/GitHub (US-002), registro (US-001),
+verificar correo (US-003) y recuperar contraseña (US-005).
 
 Uso desde el juego:
     cliente, jugador = ejecutar_pantallas_cuentas(ventana)
@@ -9,6 +9,7 @@ Uso desde el juego:
 Para probarlas solas:  python pantallas_cuentas.py   (con el backend encendido)
 """
 import sys
+import webbrowser
 
 import pygame
 
@@ -36,6 +37,7 @@ class Pantalla:
         self.y_inicio = alto // 2 - 200
         self.campos: list[CampoTexto] = []
         self.botones: list[Boton] = []
+        self.y_mensaje = self.y_inicio + 90  # dónde va el mensaje si la pantalla no tiene campos
 
     def mostrar_error(self, texto: str) -> None:
         self.mensaje, self.color_mensaje = texto, ROJO
@@ -45,6 +47,8 @@ class Pantalla:
 
     def pasar_al_siguiente_campo(self) -> None:
         """Tab mueve el cursor al siguiente campo."""
+        if not self.campos:
+            return
         actual = next((i for i, c in enumerate(self.campos) if c.activo), -1)
         for campo in self.campos:
             campo.activo = False
@@ -64,6 +68,10 @@ class Pantalla:
         return None
 
     def enviar(self):
+        return None
+
+    def actualizar(self):
+        """Se llama en cada cuadro, aunque no haya eventos. Devuelve una acción o None."""
         return None
 
     def dibujar(self) -> None:
@@ -87,7 +95,7 @@ class Pantalla:
 
         if self.mensaje:
             texto = self.fuente_chica.render(self.mensaje, True, self.color_mensaje)
-            y_mensaje = self.campos[-1].rect.bottom + 16
+            y_mensaje = self.campos[-1].rect.bottom + 16 if self.campos else self.y_mensaje
             self.ventana.blit(texto, texto.get_rect(center=(ancho_ventana // 2, y_mensaje)))
 
 
@@ -95,22 +103,39 @@ class PantallaLogin(Pantalla):
     """US-004: iniciar sesión con usuario (o correo) y contraseña."""
 
     titulo = "Iniciar sesión"
+    # Se guarda aquí para que las pruebas lo puedan cambiar y no abran el navegador
+    abrir_navegador = staticmethod(webbrowser.open)
 
     def __init__(self, ventana, cliente):
         super().__init__(ventana, cliente)
+        self.y_inicio -= 30
         y = self.y_inicio + 110
         self.campo_usuario = CampoTexto(self.x, y, ANCHO_PANEL, "Usuario o correo")
         self.campo_contrasena = CampoTexto(self.x, y + 75, ANCHO_PANEL, "Contraseña", oculto=True)
         self.campos = [self.campo_usuario, self.campo_contrasena]
         self.boton_entrar = Boton(self.x, y + 175, ANCHO_PANEL, "Entrar")
-        self.boton_registro = Boton(self.x, y + 233, ANCHO_PANEL, "Crear una cuenta", principal=False)
-        self.boton_olvide = Boton(self.x, y + 291, ANCHO_PANEL, "Olvidé mi contraseña", principal=False)
-        self.botones = [self.boton_entrar, self.boton_registro, self.boton_olvide]
+        # US-002: dos botones lado a lado
+        mitad = (ANCHO_PANEL - 10) // 2
+        self.boton_google = Boton(self.x, y + 233, mitad, "Entrar con Google", principal=False)
+        self.boton_github = Boton(self.x + mitad + 10, y + 233, mitad, "Entrar con GitHub", principal=False)
+        self.boton_registro = Boton(self.x, y + 291, ANCHO_PANEL, "Crear una cuenta", principal=False)
+        self.boton_olvide = Boton(self.x, y + 349, ANCHO_PANEL, "Olvidé mi contraseña", principal=False)
+        self.botones = [
+            self.boton_entrar,
+            self.boton_google,
+            self.boton_github,
+            self.boton_registro,
+            self.boton_olvide,
+        ]
         self.campo_usuario.activo = True
 
     def revisar_botones(self, evento):
         if self.boton_entrar.fue_presionado(evento):
             return self.enviar()
+        if self.boton_google.fue_presionado(evento):
+            return self.entrar_con_red_social("google")
+        if self.boton_github.fue_presionado(evento):
+            return self.entrar_con_red_social("github")
         if self.boton_registro.fue_presionado(evento):
             return ("ir_a_registro", None)
         if self.boton_olvide.fue_presionado(evento):
@@ -132,6 +157,82 @@ class PantallaLogin(Pantalla):
             self.campo_contrasena.texto = ""
             return None
         return ("sesion_iniciada", jugador)
+
+    def entrar_con_red_social(self, proveedor: str):
+        """US-002: abre Google/GitHub en el navegador y pasa a la pantalla de espera."""
+        try:
+            inicio = self.cliente.iniciar_login_social(proveedor)
+        except ErrorAPI as error:
+            self.mostrar_error(error.mensaje)
+            return None
+        self.abrir_navegador(inicio["url"])
+        return ("esperando_navegador", (proveedor, inicio))
+
+
+class PantallaEsperandoNavegador(Pantalla):
+    """US-002: el jugador está iniciando sesión en el navegador; el juego espera.
+
+    Cada 2 segundos le pregunta al backend si ya terminó.
+    """
+
+    titulo = "Revisá tu navegador"
+    SEGUNDOS_ENTRE_PREGUNTAS = 2
+    NOMBRES = {"google": "Google", "github": "GitHub"}
+
+    def __init__(self, ventana, cliente, proveedor: str, inicio: dict):
+        super().__init__(ventana, cliente)
+        self.proveedor = proveedor
+        self.url = inicio["url"]
+        self.codigo_espera = inicio["codigo_espera"]
+        self.ultima_pregunta = pygame.time.get_ticks()
+        self.terminado = False
+        y = self.y_inicio + 190
+        self.boton_abrir = Boton(self.x, y, ANCHO_PANEL, "Abrir el navegador otra vez", principal=False)
+        self.boton_cancelar = Boton(self.x, y + 58, ANCHO_PANEL, "Cancelar", principal=False)
+        self.botones = [self.boton_abrir, self.boton_cancelar]
+        self.y_mensaje = y - 25
+        nombre = self.NOMBRES.get(proveedor, proveedor)
+        self.lineas = [
+            f"Iniciá sesión con {nombre} en la ventana del navegador.",
+            "Cuando termines, el juego sigue solo.",
+        ]
+
+    def revisar_botones(self, evento):
+        if self.boton_abrir.fue_presionado(evento):
+            PantallaLogin.abrir_navegador(self.url)
+        if self.boton_cancelar.fue_presionado(evento):
+            return ("ir_a_login", None)
+        return None
+
+    def actualizar(self):
+        """Pregunta al backend si el jugador ya terminó (no en cada cuadro, cada 2 segundos)."""
+        ahora = pygame.time.get_ticks()
+        if self.terminado or ahora - self.ultima_pregunta < self.SEGUNDOS_ENTRE_PREGUNTAS * 1000:
+            return None
+        self.ultima_pregunta = ahora
+        try:
+            respuesta = self.cliente.revisar_login_social(self.codigo_espera)
+        except ErrorAPI as error:
+            self.terminado = True
+            return ("error_red_social", error.mensaje)
+
+        if respuesta["estado"] == "listo":
+            self.terminado = True
+            return ("sesion_iniciada", respuesta["jugador"])
+        if respuesta["estado"] == "error":
+            self.terminado = True
+            return ("error_red_social", respuesta.get("mensaje") or "No se pudo iniciar sesión")
+        return None  # "pendiente": se sigue esperando
+
+    def dibujar(self) -> None:
+        super().dibujar()
+        centro_x = self.ventana.get_width() // 2
+        for i, linea in enumerate(self.lineas):
+            texto = self.fuente_chica.render(linea, True, GRIS)
+            self.ventana.blit(texto, texto.get_rect(center=(centro_x, self.y_inicio + 95 + i * 24)))
+        puntos = "." * (pygame.time.get_ticks() // 500 % 4)  # animación de "esperando..."
+        texto = self.fuente.render(f"Esperando{puntos}", True, CIAN)
+        self.ventana.blit(texto, (centro_x - 50, self.y_inicio + 140))
 
 
 class PantallaRegistro(Pantalla):
@@ -324,16 +425,19 @@ def ejecutar_pantallas_cuentas(ventana, cliente: ClienteAPI | None = None):
     pantalla = PantallaLogin(ventana, cliente)
 
     while True:
+        acciones = []
         for evento in pygame.event.get():
             if evento.type == pygame.QUIT or (
                 evento.type == pygame.KEYDOWN and evento.key == pygame.K_ESCAPE
             ):
                 pygame.quit()
                 sys.exit()
+            acciones.append(pantalla.manejar_evento(evento))
+        acciones.append(pantalla.actualizar())  # p. ej. revisar si terminó el login con Google
 
-            accion = pantalla.manejar_evento(evento)
-            if accion is None:
-                continue
+        # Solo se atiende la primera acción: después la pantalla puede haber cambiado
+        accion = next((a for a in acciones if a is not None), None)
+        if accion is not None:
             tipo, dato = accion  # dato: el jugador, el correo o None, según la acción
             if tipo == "ir_a_registro":
                 pantalla = PantallaRegistro(ventana, cliente)
@@ -362,6 +466,12 @@ def ejecutar_pantallas_cuentas(ventana, cliente: ClienteAPI | None = None):
                 pantalla.campo_usuario.activo = False
                 pantalla.campo_contrasena.activo = True
                 pantalla.mostrar_exito("Contraseña cambiada. Iniciá sesión")
+            elif tipo == "esperando_navegador":  # US-002
+                proveedor, inicio = dato
+                pantalla = PantallaEsperandoNavegador(ventana, cliente, proveedor, inicio)
+            elif tipo == "error_red_social":  # US-002
+                pantalla = PantallaLogin(ventana, cliente)
+                pantalla.mostrar_error(dato)
             elif tipo == "sesion_iniciada":
                 return cliente, dato
 

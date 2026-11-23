@@ -75,6 +75,8 @@ erDiagram
 | `participaciones` | Puntos y posición final de cada jugador en cada partida | Puntajes · US-020 |
 | `eventos_partida` | Lo que ocurre en una partida: extracciones, terminales, penalizaciones | Eventos · US-009, US-010, US-014 |
 | `records` | Récords históricos por jugador | Récords · US-023 |
+| `cuentas_sociales` | Une a un jugador con su cuenta de Google o GitHub (id que da el proveedor) | Login con redes sociales · US-002 |
+| `inicios_sociales` | Inicios de sesión con Google/GitHub en proceso (vencen a los 10 min) | Login con redes sociales · US-002 |
 
 ## Decisiones
 
@@ -82,6 +84,10 @@ erDiagram
   (o usando `jugadores.puntos_totales`), así nunca queda desactualizado.
 - **Correo y usuario únicos** con restricciones `UNIQUE` en la base de datos, no solo validación en código.
 - **`contrasena_hash` puede estar vacía** para cuentas creadas con Google, GitHub, etc. (US-002).
+- **Las redes sociales van en una tabla aparte** (`cuentas_sociales`) y no como columnas de `jugadores`:
+  así un jugador puede tener Google y GitHub a la vez, y las bases de datos que ya existían no
+  necesitan cambios (las tablas nuevas se crean solas al arrancar el backend).
+- **Se guarda el id del proveedor, no solo el correo**, porque el correo de Google/GitHub puede cambiar.
 - **Una sola base de datos en el Sprint 2.** La arquitectura lógica del ERS propone bases regionales
   (América y Europa) con balance de carga; eso queda como arquitectura ideal y no se implementa por ahora.
 - **Pruebas con SQLite en memoria**, para que corran sin Docker en cualquier compu y en el pipeline de CI.

@@ -113,6 +113,24 @@ class ClienteAPI:
         """US-022: top de jugadores por puntos."""
         return self._enviar("GET", f"/api/ranking?limite={limite}")
 
+    def iniciar_login_social(self, proveedor: str) -> dict:
+        """US-002 paso 1: pide la página de Google/GitHub para abrirla en el navegador.
+
+        Devuelve {"url": ..., "codigo_espera": ...}. proveedor: "google" o "github".
+        """
+        return self._enviar("POST", f"/api/auth/social/{proveedor}/iniciar")
+
+    def revisar_login_social(self, codigo_espera: str) -> dict:
+        """US-002 paso 4: pregunta si el jugador ya terminó en el navegador.
+
+        Devuelve {"estado": "pendiente" | "listo" | "error", ...}.
+        Si está "listo", guarda el token igual que el login normal.
+        """
+        respuesta = self._enviar("POST", "/api/auth/social/revisar", {"codigo_espera": codigo_espera})
+        if respuesta["estado"] == "listo":
+            self.token = respuesta["access_token"]
+        return respuesta
+
     def cerrar_sesion(self) -> None:
         """Olvida el token. El jugador tiene que volver a iniciar sesión."""
         self.token = None
