@@ -1,0 +1,48 @@
+# Levanta todo el sistema: base de datos, backend de cuentas y servidor de partidas.
+# Uso:  docker compose up --build
+#   Backend de cuentas:    http://localhost:8000/docs
+#   Servidor de partidas:  http://localhost:8002/docs
+# Las claves (Google, GitHub y la del hardware) se leen del archivo .env (ver .env.ejemplo)
+services:
+  db:
+    image: postgres:16
+    environment:
+      POSTGRES_USER: reactor
+      POSTGRES_PASSWORD: reactor
+      POSTGRES_DB: reactor
+    ports:
+      - "5432:5432"
+    volumes:
+      - datos_postgres:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U reactor -d reactor"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  backend:
+    build: ./backend
+    environment:
+      DATABASE_URL: postgresql+psycopg2://reactor:reactor@db:5432/reactor
+      # Login con Google y GitHub (US-002). Los valores salen del archivo .env (ver .env.ejemplo)
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      URL_BACKEND: ${URL_BACKEND:-http://localhost:8000}
+    ports:
+      - "8000:8000"
+    depends_on:
+      db:
+        condition: service_healthy
+
+  partidas:
+    build: ./Logica-juego-backend
+    environment:
+      # Clave que debe enviar el control físico en el encabezado x-control-token
+      CONTROL_HARDWARE_TOKEN: ${CONTROL_HARDWARE_TOKEN:-}
+    ports:
+      - "8002:8002"
+
+volumes:
+  datos_postgres:
