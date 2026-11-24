@@ -3,6 +3,7 @@ import sys
 import math #para los guardianes 
 import os #Para las imagenes 
 import serial
+from celdas_energia import GestorCeldas  # US-011: celdas de energía
 pygame.init()
 
 
@@ -369,6 +370,8 @@ def dibujar_mapa(superficie, matriz):
 
 
 cargar_Mapa(matriz_mapa)
+#US-011: celdas de energia que el jugador recoge para sumar puntos
+celdas = GestorCeldas(matriz_mapa, TAMANO_CELDA, OFFSET_X, OFFSET_Y)
 
 
 if not pygame.font.get_init():
@@ -532,6 +535,7 @@ while True:
 
 
         dibujar_mapa(ventana, matriz_mapa)
+        celdas.dibujar(ventana) #US-011
  #Logica normal
         #Detectar si el jugador está en una trampa
         en_trampa = any(
@@ -547,6 +551,7 @@ while True:
 
         #Actualizar al jugador
         jugador.Mover(teclas, comando_hardware, obstaculos)
+        celdas.actualizar(jugador.rect) #US-011: recoger celdas
 
         #Actualizar y dibujar guardianes
         for guardian in guardianes:
@@ -559,6 +564,7 @@ while True:
 
         #Dibujar jugador al final para que quede visible
         jugador.dibujar(ventana)
+        celdas.dibujar_marcador(ventana) #US-011: puntos y celdas
 
     elif estado_juego == "VICTORIA":
 
