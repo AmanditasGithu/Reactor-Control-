@@ -50,6 +50,24 @@ python juego.py
 - En el menú, **Jugar**.
 - Moverse con las flechas o con el Arduino · **V**: ceremonia de victoria · **ESC**: volver al menú.
 
+## Desde el celular (US-024)
+
+El backend también sirve una versión web para celular: login, registro, verificación, recuperar
+contraseña, Google y GitHub, menú, perfil y ranking.
+
+1. Encender el backend para que acepte conexiones de otros dispositivos:
+   ```
+   cd backend
+   .venv\Scripts\activate
+   $env:DATABASE_URL="sqlite:///./local.db"
+   uvicorn app.main:app --host 0.0.0.0 --port 8000
+   ```
+2. Buscar la IP de la computadora con `ipconfig` (línea "Dirección IPv4", por ejemplo `192.168.1.50`).
+3. Con el celular conectado al **mismo WiFi**, abrir en el navegador: `http://192.168.1.50:8000/movil`
+4. Si no carga, permitir Python en el Firewall de Windows (redes privadas).
+
+En la computadora también se puede abrir en `http://localhost:8000/movil`.
+
 ## Con Docker (todo el sistema)
 
 Levanta la base de datos PostgreSQL, el backend de cuentas y el servidor de partidas:
