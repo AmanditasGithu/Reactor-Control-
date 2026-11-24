@@ -6,9 +6,9 @@ Pantallas del juego hechas con **pygame-ce**. Se importa igual que pygame (`impo
 
 ```
 frontend/
-├── cliente_api.py        ← habla con el backend (registro, login)
+├── cliente_api.py        ← habla con el backend (registro, login, redes sociales)
 ├── componentes.py        ← colores, campos de texto y botones
-├── pantallas_cuentas.py  ← pantallas de login (US-004) y registro (US-001)
+├── pantallas_cuentas.py  ← login (US-004), login con Google/GitHub (US-002) y registro (US-001)
 ├── pantallas_menu.py     ← menú principal, perfil (US-006) y ranking (US-022)
 ├── juego.py              ← punto de entrada: login → menú → arena
 └── tests/                ← pruebas automáticas

@@ -143,3 +143,46 @@ class CodigoVerificacion(Base):
     usado: Mapped[bool] = mapped_column(Boolean, default=False)
     intentos: Mapped[int] = mapped_column(Integer, default=0)  # intentos fallidos
     fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=ahora)
+
+
+class CuentaSocial(Base):
+    """Une a un jugador con su cuenta de Google o GitHub (US-002).
+
+    Se guarda el id que da el proveedor (no el correo), porque el correo de una
+    cuenta de Google o GitHub puede cambiar, pero ese id no.
+    Un jugador puede tener varias: por ejemplo Google y GitHub a la vez.
+    """
+
+    __tablename__ = "cuentas_sociales"
+    __table_args__ = (UniqueConstraint("proveedor", "proveedor_id"),)
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    jugador_id: Mapped[int] = mapped_column(ForeignKey("jugadores.id"))
+    proveedor: Mapped[str] = mapped_column(String(20))  # google o github
+    proveedor_id: Mapped[str] = mapped_column(String(100))
+    fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=ahora)
+
+
+class InicioSocial(Base):
+    """Un inicio de sesión con red social que está en proceso (US-002).
+
+    El juego abre el navegador y se queda esperando. Cuando el jugador termina en
+    Google o GitHub, el backend anota aquí quién era, y el juego lo recoge.
+    - `state_hash`: viaja por el navegador; sirve para saber a qué inicio pertenece
+      la respuesta de Google/GitHub y para evitar ataques CSRF.
+    - `espera_hash`: solo lo conoce el juego; con él recoge el token al final.
+    Los dos se guardan cifrados, vencen a los 10 minutos y sirven una sola vez.
+    """
+
+    __tablename__ = "inicios_sociales"
+
+    id: Mapped[int] = mapped_column(Integer, primary_key=True)
+    proveedor: Mapped[str] = mapped_column(String(20))
+    state_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    espera_hash: Mapped[str] = mapped_column(String(64), unique=True, index=True)
+    vence: Mapped[datetime] = mapped_column(DateTime(timezone=True))
+    # Se llena cuando el jugador termina en el navegador
+    jugador_id: Mapped[int | None] = mapped_column(ForeignKey("jugadores.id"), nullable=True)
+    error: Mapped[str | None] = mapped_column(String(200), nullable=True)
+    usado: Mapped[bool] = mapped_column(Boolean, default=False)  # el juego ya recogió el token
+    fecha: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=ahora)

@@ -21,6 +21,12 @@ services:
     build: ./backend
     environment:
       DATABASE_URL: postgresql+psycopg2://reactor:reactor@db:5432/reactor
+      # Login con Google y GitHub (US-002). Los valores salen del archivo .env (ver .env.ejemplo)
+      GOOGLE_CLIENT_ID: ${GOOGLE_CLIENT_ID:-}
+      GOOGLE_CLIENT_SECRET: ${GOOGLE_CLIENT_SECRET:-}
+      GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
+      GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
+      URL_BACKEND: ${URL_BACKEND:-http://localhost:8000}
     ports:
       - "8000:8000"
     depends_on:
