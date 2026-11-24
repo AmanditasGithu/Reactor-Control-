@@ -50,6 +50,21 @@ python juego.py
 - En el menú, **Jugar**.
 - Moverse con las flechas o con el Arduino · **V**: ceremonia de victoria · **ESC**: volver al menú.
 
+## Con Docker (todo el sistema)
+
+Levanta la base de datos PostgreSQL, el backend de cuentas y el servidor de partidas:
+
+```
+copy .env.ejemplo .env
+docker compose up --build
+```
+
+- Backend de cuentas: http://localhost:8000/docs
+- Servidor de partidas: http://localhost:8002/docs
+
+Para usar el juego con este backend: `$env:REACTOR_API_URL="http://127.0.0.1:8000"` antes de `python juego.py`.
+Para apagar: `Ctrl + C` y luego `docker compose down`.
+
 ## Pruebas
 
 ```

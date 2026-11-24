@@ -1,5 +1,8 @@
-# Levanta la base de datos y el backend para desarrollo local.
+# Levanta todo el sistema: base de datos, backend de cuentas y servidor de partidas.
 # Uso:  docker compose up --build
+#   Backend de cuentas:    http://localhost:8000/docs
+#   Servidor de partidas:  http://localhost:8002/docs
+# Las claves (Google, GitHub y la del hardware) se leen del archivo .env (ver .env.ejemplo)
 services:
   db:
     image: postgres:16
@@ -32,6 +35,14 @@ services:
     depends_on:
       db:
         condition: service_healthy
+
+  partidas:
+    build: ./Logica-juego-backend
+    environment:
+      # Clave que debe enviar el control físico en el encabezado x-control-token
+      CONTROL_HARDWARE_TOKEN: ${CONTROL_HARDWARE_TOKEN:-}
+    ports:
+      - "8002:8002"
 
 volumes:
   datos_postgres:
