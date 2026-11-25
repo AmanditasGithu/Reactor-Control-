@@ -68,6 +68,25 @@ contraseña, Google y GitHub, menú, perfil y ranking.
 
 En la computadora también se puede abrir en `http://localhost:8000/movil`.
 
+### Jugar desde el celular
+
+La pantalla **Jugar** se conecta al servidor de partidas, así que también hay que encenderlo
+(en otra terminal, en la misma compu):
+
+```
+cd Logica-juego-backend
+uvicorn main:app --host 0.0.0.0 --port 8002
+```
+
+- Un jugador toca **Crear partida nueva** y les pasa el número a los demás; ellos lo escriben o lo
+  tocan en la lista y tocan **Unirme**. Con 2 o más jugadores se toca **Iniciar partida**.
+- Se mueve con las flechas de la pantalla. Cerca del reactor (zona amarilla) se mantiene
+  presionado **EXTRAER** para sacar energía y sumar puntos. Las terminales (T) y la estrella x2
+  también dan puntos.
+- Al terminar, los resultados se guardan en el perfil y el ranking (si el backend y el servidor
+  de partidas tienen la misma `REACTOR_RESULTADOS_TOKEN`, ver `.env.ejemplo`).
+- Si no carga en el celular, permitir también el puerto **8002** en el Firewall de Windows.
+
 ## Con Docker (todo el sistema)
 
 Levanta la base de datos PostgreSQL, el backend de cuentas y el servidor de partidas:

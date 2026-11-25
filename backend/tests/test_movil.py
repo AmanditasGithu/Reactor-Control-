@@ -26,3 +26,13 @@ def test_la_pagina_tiene_todas_las_pantallas(client):
     html = client.get("/movil/").text
     for pantalla in ["login", "registro", "verificar", "recuperar", "menu", "perfil", "ranking"]:
         assert f'id="pantalla-{pantalla}"' in html
+
+
+def test_se_sirve_el_juego_para_celular(client):
+    """US-024: la pantalla Jugar trae la arena, las flechas y el botón de extraer."""
+    respuesta = client.get("/movil/juego.js")
+    assert respuesta.status_code == 200
+    assert "/ws/partidas/" in respuesta.text
+    pagina = client.get("/movil/").text
+    for parte in ('id="arena"', 'data-direccion="ARRIBA"', 'id="extraer"', 'src="juego.js"'):
+        assert parte in pagina
