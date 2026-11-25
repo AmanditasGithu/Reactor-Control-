@@ -17,7 +17,8 @@ argumentos.add_argument("--host", default=os.getenv("REACTOR_WS_HOST", "127.0.0.
 opciones = argumentos.parse_args()
 if bool(opciones.partida) != bool(opciones.jugador):
     argumentos.error("Debes indicar ambos: --partida e --jugador")
-
+import time 
+from Adapter import AdaptadorEstadoBackend
 pygame.init()
 
 
@@ -160,15 +161,15 @@ matriz_mapa = [
     "####################################",
     "#              T                   #",
     "#   ########   #   #############   #",
-    "#          #   #   #               #",
+    "#          #   #   #             E #",
     "#       T  #   #####   ####### #   #",
     "#   #                  #     # #   #",
     "#   ########   #########     # ### #",
-    "#              #        G          #",
-    "#   ############   R          #    #",
+    "#                       G          #",
+    "#   ############   R               #",
     "#       G           #          # T #",
     "# T ##################   ###########",
-    "#              T               #   #",
+    "# E             T               #  #",
     "####################################"
 ]
 
@@ -205,6 +206,8 @@ ALTO_MAPA = FILAS * TAMANO_CELDA
 
 OFFSET_X = (ANCHO_PANTALLA - ANCHO_MAPA) // 2
 OFFSET_Y = (ALTO_PANTALLA - ALTO_MAPA) // 2
+
+adaptador = AdaptadorEstadoBackend(OFFSET_X, OFFSET_Y, TAMANO_CELDA)
 
 jugador = Jugador(
     OFFSET_X + TAMANO_CELDA,
@@ -308,47 +311,34 @@ except (pygame.error, FileNotFoundError) as e:
     USAR_VICTORIA_VISUAL = False
 
 
-
+coords_reactor = (5, 5)
+coords_terminales = []
 
 def cargar_Mapa(matriz):
-    global reactor
+    global reactor, coords_reactor, coords_terminales
 
     obstaculos.clear()
     guardianes.clear()
     reactor = None
+    coords_terminales = []
 
     for fila_idx, fila in enumerate(matriz):
         for col_idx, caracter in enumerate(fila):
           x = OFFSET_X + (col_idx * TAMANO_CELDA)
           y = OFFSET_Y + (fila_idx * TAMANO_CELDA)
-          
+
           if caracter == "#":
-                obstaculos.append(
-                    Obstaculo(
-                        x, y,
-                        TAMANO_CELDA, TAMANO_CELDA,
-                        "barrera"
-                    )
-                )
-
+                obstaculos.append(Obstaculo(x, y, TAMANO_CELDA, TAMANO_CELDA, "barrera"))
           elif caracter == "T":
-                obstaculos.append(
-                    Obstaculo(
-                        x, y,
-                        TAMANO_CELDA, TAMANO_CELDA,
-                        "trampa"
-                    )
-                )
-
+                obstaculos.append(Obstaculo(x, y, TAMANO_CELDA, TAMANO_CELDA, "trampa"))
           elif caracter == "G":
                 guardianes.append(Guardian(x, y))
-
           elif caracter == "R":
-                reactor = pygame.Rect(
-                    x, y,
-                    TAMANO_CELDA, TAMANO_CELDA
-                )
-
+               reactor = pygame.Rect(x, y, TAMANO_CELDA, TAMANO_CELDA)
+               coords_reactor = (col_idx, fila_idx)
+          elif caracter == "E":
+                coords_terminales.append((col_idx, fila_idx))
+                    
 
 def dibujar_mapa(superficie, matriz):
     for fila_idx, fila in enumerate(matriz):
@@ -384,9 +374,10 @@ def dibujar_mapa(superficie, matriz):
 
 
 cargar_Mapa(matriz_mapa)
-#US-011: celdas de energia que el jugador recoge para sumar puntos
-celdas = GestorCeldas(matriz_mapa, TAMANO_CELDA, OFFSET_X, OFFSET_Y)
-
+celdas = GestorCeldas(matriz_mapa, TAMANO_CELDA, OFFSET_X, OFFSET_Y)  # US-011: celdas de energía
+partida, jugador_logico = adaptador.crear_partida_integrada(
+    coords_reactor[0], coords_reactor[1], coords_terminales
+)
 
 if not pygame.font.get_init():
     pygame.font.init()
@@ -476,30 +467,141 @@ def ceremonia_victoria(superficie,ganador,datos_jugadores):
         if rect_barra.collidepoint(pos_mouse):
 
             #Dibujo las estadisticas flotantes 
-            tooltip_rect = pygame.Rect(pos_mouse[0], pos_mouse[1] + 15, 200, 100)
+            tooltip_rect = pygame.Rect(pos_mouse[0], pos_mouse[1] + 15, 220, 125)
             pygame.draw.rect(superficie, (10, 15, 25), tooltip_rect)
             pygame.draw.rect(superficie, (0, 220, 200), tooltip_rect, 2)
 
             fuente_tip = pygame.font.SysFont("Arial", 14)
             t1 = fuente_tip.render(f"Jugador: {jg['nombre']}", True, (255, 255, 255))
-            # El servidor no comunica aún estadísticas individuales de energía/celdas/guardianes.
-            # No mostramos ceros inventados cuando usamos resultados reales.
-            t2 = fuente_tip.render(
-                f"Energía Extraída: {jg['energia']}" if 'energia' in jg else "Energía Extraída: sin dato",
-                True, (200, 200, 200))
-            t3 = fuente_tip.render(
-                f"Celdas Recogidas: {jg['celdas']}" if 'celdas' in jg else "Celdas Recogidas: sin dato",
-                True, (200, 200, 200))
-            t4 = fuente_tip.render(
-                f"Guardias Evitados: {jg['guardias']}" if 'guardias' in jg else "Guardias Evitados: sin dato",
-                True, (200, 200, 200))
+            t2 = fuente_tip.render(f"Energía Extraída: {jg.get('energia', 0)}", True, (200, 200, 200))
+            t3 = fuente_tip.render(f"Celdas de Energía: {jg.get('celdas', 0)}", True, (200, 200, 200))
+            t4 = fuente_tip.render(f"Golpes Recibidos: {jg.get('golpes_sufridos', 0)}", True, (200, 200, 200))
+            t5 = fuente_tip.render(f"Vida Final: {jg.get('vida', 0)}", True, (200, 200, 200))
 
-            superficie.blit(t1, (tooltip_rect.x + 10, tooltip_rect.y + 10))
-            superficie.blit(t2, (tooltip_rect.x + 10, tooltip_rect.y + 30))
-            superficie.blit(t3, (tooltip_rect.x + 10, tooltip_rect.y + 50))
-            superficie.blit(t4, (tooltip_rect.x + 10, tooltip_rect.y + 70))
+            superficie.blit(t1, (tooltip_rect.x + 10, tooltip_rect.y + 8))
+            superficie.blit(t2, (tooltip_rect.x + 10, tooltip_rect.y + 28))
+            superficie.blit(t3, (tooltip_rect.x + 10, tooltip_rect.y + 48))
+            superficie.blit(t4, (tooltip_rect.x + 10, tooltip_rect.y + 68))
+            superficie.blit(t5, (tooltip_rect.x + 10, tooltip_rect.y + 88))
 
+def dibujar_barra_inferior_deltarune(
+    superficie,
+    nombre_jugador,
+    ataques,
+    max_ataques,
+    energia,
+    max_energia,
+    celdas,
+    max_celdas,
+):
+    alto_panel = 78
+    margen_x = 24
+    ancho_panel = ANCHO_PANTALLA - (margen_x * 2)
+    y_panel = ALTO_PANTALLA - alto_panel - 10
 
+    panel_rect = pygame.Rect(margen_x, y_panel, ancho_panel, alto_panel)
+    pygame.draw.rect(superficie, (12, 14, 24), panel_rect)
+    pygame.draw.rect(superficie, (240, 240, 255), panel_rect, 3)
+
+##Aqui es lo de la imagen del jugador 
+    tam_retrato = 54
+    retrato_rect = pygame.Rect(panel_rect.x + 14, panel_rect.y + 12, tam_retrato, tam_retrato)
+    if USAR_IMAGENES:
+        retrato_img = pygame.transform.scale(img_jugador, (tam_retrato, tam_retrato))
+        superficie.blit(retrato_img, retrato_rect)
+    else:
+        pygame.draw.rect(superficie, (0, 200, 255), retrato_rect)
+    pygame.draw.rect(superficie, (255, 255, 255), retrato_rect, 2)
+
+    fuente_nombre = pygame.font.SysFont(["Courier New", "Consolas", "Arial Black"], 22, bold=True)
+    fuente_stat = pygame.font.SysFont(["Courier New", "Consolas", "Arial"], 14, bold=True)
+
+    txt_nombre = fuente_nombre.render(nombre_jugador.upper(), True, (255, 255, 255))
+    superficie.blit(txt_nombre, (retrato_rect.right + 14, panel_rect.y + 24))
+
+    ##Barras horizontales 
+    stats = [
+        ("ATAQUES", ataques, max_ataques, (255, 70, 110)),
+        ("ENERGIA", energia, max_energia, (0, 225, 255)),
+        ("CELDAS", celdas, max_celdas, (80, 255, 130)),
+    ]
+
+    inicio_barras_x = retrato_rect.right + 145
+    espacio_disponible = panel_rect.right - inicio_barras_x - 20
+    ancho_bloque = max(120, espacio_disponible // len(stats) - 14)
+    alto_barra = 14
+
+    for idx, (etiqueta, valor, maximo, color_barra) in enumerate(stats):
+        bx = inicio_barras_x + idx * (ancho_bloque + 14)
+        by_texto = panel_rect.y + 14
+        by_barra = panel_rect.y + 38
+
+        lbl = fuente_stat.render(f"{etiqueta}: {valor}", True, (235, 240, 255))
+        superficie.blit(lbl, (bx, by_texto))
+
+        fondo_barra = pygame.Rect(bx, by_barra, ancho_bloque, alto_barra)
+        pygame.draw.rect(superficie, (35, 40, 60), fondo_barra)
+
+        ratio = 0.0 if maximo <= 0 else max(0.0, min(1.0, valor / maximo))
+        ancho_relleno = int(ancho_bloque * ratio)
+        if ancho_relleno > 0:
+            pygame.draw.rect(superficie, color_barra, pygame.Rect(bx, by_barra, ancho_relleno, alto_barra))
+
+        pygame.draw.rect(superficie, (200, 205, 230), fondo_barra, 2)
+
+def dibujar_anuncio_game_over(superficie, motivo, nombre_jugador, ahora):
+    if not motivo:
+        return
+
+    if motivo == "GUARDIANES":
+        titulo = f"GAME OVER {nombre_jugador.upper()}"
+        subtitulo = "ATAQUE DE GUARDIANES"
+        color_borde = (255, 55, 85)
+    elif motivo == "TIEMPO":
+        titulo = "GAME OVER"
+        subtitulo = "TIEMPO AGOTADO"
+        color_borde = (255, 195, 0)
+    else:
+        return
+
+    pulso = int(math.sin(ahora * 10) * 5)
+
+    surf_titulo = fuente_evento_gigante.render(titulo, True, (255, 255, 255))
+    surf_titulo_sombra = fuente_evento_gigante.render(titulo, True, (15, 15, 20))
+
+    fuente_sub = pygame.font.SysFont(["Courier New", "Consolas", "Impact", "Arial Black"], 36, bold=True)
+    surf_sub = fuente_sub.render(subtitulo, True, color_borde)
+    surf_sub_sombra = fuente_sub.render(subtitulo, True, (15, 15, 20))
+
+    pad_x, pad_y = 44, 28
+    ancho_caja = max(surf_titulo.get_width(), surf_sub.get_width()) + pad_x * 2
+    alto_caja = surf_titulo.get_height() + surf_sub.get_height() + 18 + pad_y * 2
+
+    caja_rect = pygame.Rect(
+        (ANCHO_PANTALLA - ancho_caja) // 2,
+        (ALTO_PANTALLA - alto_caja) // 2 + pulso,
+        ancho_caja,
+        alto_caja,
+    )
+
+    velo = pygame.Surface((ANCHO_PANTALLA, ALTO_PANTALLA), pygame.SRCALPHA)
+    velo.fill((0, 0, 0, 125))
+    superficie.blit(velo, (0, 0))
+
+    pygame.draw.rect(superficie, (16, 18, 28), caja_rect, border_radius=10)
+    pygame.draw.rect(superficie, color_borde, caja_rect, 6, border_radius=10)
+
+    x_titulo = caja_rect.centerx - surf_titulo.get_width() // 2
+    y_titulo = caja_rect.y + pad_y
+
+    x_sub = caja_rect.centerx - surf_sub.get_width() // 2
+    y_sub = y_titulo + surf_titulo.get_height() + 16
+
+    superficie.blit(surf_titulo_sombra, (x_titulo + 4, y_titulo + 4))
+    superficie.blit(surf_titulo, (x_titulo, y_titulo))
+
+    superficie.blit(surf_sub_sombra, (x_sub + 3, y_sub + 3))
+    superficie.blit(surf_sub, (x_sub, y_sub))
 #Comando de pygame para setear un timer 
 reloj = pygame.time.Clock()
 
@@ -508,15 +610,16 @@ reloj = pygame.time.Clock()
 
 estado_juego = "JUGANDO"
 
-datos_jugadores_ejemplo = [
-    {"nombre": "AZUL", "puntos": 1250, "energia": 800,
-    "celdas": 5, "guardias": 2},
-    {"nombre": "NARANJA", "puntos": 980, "energia": 600,
-    "celdas": 3, "guardias": 1},
-    {"nombre": "VERDE", "puntos": 750, "energia": 450,
-    "celdas": 2, "guardias": 0}
+rivales_ejemplo = [
+    {"id_jugador": 2, "nombre": "NARANJA", "x": 4, "y": 3, "puntos": 20, "extrayendo": False},
+    {"id_jugador": 3, "nombre": "VERDE", "x": 6, "y": 5, "puntos": 15, "extrayendo": False},
 ]
 
+resultados_ejemplo = [
+    {"id_jugador": 1, "nombre": "AZUL", "puntos": 1250, "energia": 800, "celdas": 5, "guardias": 2},
+    {"id_jugador": 2, "nombre": "NARANJA", "puntos": 980, "energia": 600, "celdas": 3, "guardias": 1},
+    {"id_jugador": 3, "nombre": "VERDE", "puntos": 750, "energia": 450, "celdas": 2, "guardias": 0},
+]
 ganador_partida = "Azul"
 
 reloj = pygame.time.Clock()
@@ -542,6 +645,42 @@ def cerrar_juego():
         puerto_serial.close()
     pygame.quit()
     sys.exit()
+vida_jugador = 100
+vida_maxima = 100
+ultimo_golpe_guardian = 0.0
+cooldown_golpe = 1.5   #Cooldown entre golpes
+
+
+#Esto se hace para visualizar los stats del jugador dentro de la partida
+ataques_sufridos = 0
+max_ataques_barra = 5    
+energia_extraida = 0
+max_energia_barra = 100    
+celdas_obtenidas = 0
+max_celdas_barra = 5
+
+
+from Eventos_Especiales import FabricaEventosEscenario
+
+escenario_actual = "planta_industrial"
+evento_escenario = FabricaEventosEscenario.crear_evento(escenario_actual)
+
+
+fuente_evento_gigante = pygame.font.SysFont(
+    ["Courier New", "Consolas", "Impact", "Arial Black"],
+    54,
+    bold=True
+)
+
+
+motivo_game_over = None
+tiempo_inicio_game_over = 0.0
+duracion_game_over = 8.0 #Lo meti a 8 segundos porque se me quedaba un monton de tiempo en la pantalla de victoria 
+
+
+
+
+
 
 while True:
     if cliente_marcador is not None:
@@ -569,6 +708,7 @@ while True:
 
     #OJO, Segun el estado es Jugando o Victoria alterno la pantalla
     if estado_juego == "JUGANDO":
+        ahora = time.monotonic()
 
         ventana.fill((20, 25, 35))
 
@@ -588,7 +728,7 @@ while True:
 
 
         dibujar_mapa(ventana, matriz_mapa)
-        celdas.dibujar(ventana) #US-011
+        celdas.dibujar(ventana)  # US-011
  #Logica normal
         #Detectar si el jugador está en una trampa
         en_trampa = any(
@@ -604,37 +744,175 @@ while True:
 
         #Actualizar al jugador
         jugador.Mover(teclas, comando_hardware, obstaculos)
-        celdas.actualizar(jugador.rect) #US-011: recoger celdas
+        jugador_logico.puntos += celdas.actualizar(jugador.rect)  # US-011: cada celda suma 10 puntos
 
         #Actualizar y dibujar guardianes
         for guardian in guardianes:
             guardian.actualizar(jugador)
             guardian.dibujar(ventana)
 
+            if jugador.rect.colliderect(guardian.rect) and (ahora - ultimo_golpe_guardian) >= cooldown_golpe:
+                vida_jugador = max(0, vida_jugador - 20)
+                ataques_sufridos += 1
+                jugador_logico.puntos = max(0, jugador_logico.puntos - 10)
+                ultimo_golpe_guardian = ahora
+                jugador_logico.extrayendo = False
+                print(f"¡Golpe! Vida: {vida_jugador} | Puntos: {jugador_logico.puntos}")
+
+                if ataques_sufridos >= 5 or vida_jugador <= 0:
+                    if motivo_game_over is None:
+                        motivo_game_over = "GUARDIANES"
+                        tiempo_inicio_game_over = ahora
+                        jugador_logico.extrayendo = False
+                    
         #Dibujar obstáculos
         for obs in obstaculos:
             obs.dibujar(ventana)
 
         #Dibujar jugador al final para que quede visible
         jugador.dibujar(ventana)
-        if cliente_marcador is not None:
+
+        
+        adaptador.sincronizar_jugador(jugador, jugador_logico) #Sincronizco las celdas y activo las terminales de energia
+        for term in partida.terminales:
+            estaba_activa = term.activada
+            term.activar(jugador_logico)
+            if not estaba_activa and term.activada:
+                celdas_obtenidas += 1
+
+#####Logica para recargar y extraer energia dentro del reactor manteniedo E
+        partida.reactor.recargar_si_corresponde(ahora)
+        if teclas[pygame.K_e] and partida.reactor.jugador_cerca(jugador_logico) and partida.reactor.energia_actual > 0:
+            jugador_logico.extrayendo = True
+            if ahora - jugador_logico.ultimo_ciclo_extraccion >= partida.reactor.intervalo:
+                extraido = partida.reactor.extraer(jugador_logico, ahora)
+                energia_extraida += extraido
+                jugador_logico.ultimo_ciclo_extraccion = ahora
+        else:
+            jugador_logico.extrayendo = False
+
+        fuente_hud = pygame.font.SysFont("Arial", 18, bold=True)
+        for term in partida.terminales:
+            tx, ty = adaptador.celda_a_pixeles(term.x, term.y)
+            color_term = (0, 255, 120) if term.activada else (255, 215, 0)
+            pygame.draw.rect(ventana, color_term, pygame.Rect(tx, ty, TAMANO_CELDA, TAMANO_CELDA), 3)
+
+        texto_hud = fuente_hud.render(
+            f"Vida: {vida_jugador}/{vida_maxima} | Tiempo: {int(partida.tiempo_restante(ahora))}s | Puntos: {jugador_logico.puntos}/{partida.meta} | Reactor: {partida.reactor.energia_actual}/{partida.reactor.energia_maxima}",
+            True,
+            BLANCO,
+        )
+        ventana.blit(texto_hud, (20, 15))
+
+        if evento_escenario:
+            evento_escenario.actualizar(partida, jugador_logico, ahora)
+            anuncio_texto, anuncio_color = evento_escenario.obtener_anuncio(ahora)
+
+            if anuncio_texto:
+                pulso = int(math.sin(ahora * 14) * 6)
+                superficie_texto = fuente_evento_gigante.render(anuncio_texto, True, (255, 255, 255))
+                superficie_sombra = fuente_evento_gigante.render(anuncio_texto, True, (15, 15, 20))
+
+                pad_x, pad_y = 36, 22
+                ancho_caja = superficie_texto.get_width() + pad_x * 2
+                alto_caja = superficie_texto.get_height() + pad_y * 2
+
+                caja_rect = pygame.Rect(
+                    (ANCHO_PANTALLA - ancho_caja) // 2,
+                    (ALTO_PANTALLA - alto_caja) // 2 + pulso,
+                    ancho_caja,
+                    alto_caja
+                )
+
+                pygame.draw.rect(ventana, (18, 22, 32), caja_rect, border_radius=8)
+                pygame.draw.rect(ventana, anuncio_color, caja_rect, 6, border_radius=8)
+
+                pos_texto_x = caja_rect.x + pad_x
+                pos_texto_y = caja_rect.y + pad_y
+
+                ventana.blit(superficie_sombra, (pos_texto_x + 4, pos_texto_y + 4))
+                ventana.blit(superficie_texto, (pos_texto_x, pos_texto_y))
+
+        # Fin automatico de la partida por tiempo 
+        if partida.finalizar_si_corresponde(ahora):
+            if motivo_game_over is None:
+                motivo_game_over = "TIEMPO"
+                tiempo_inicio_game_over = ahora
+                jugador_logico.extrayendo = False
+
+
+        
+        rivales_px = adaptador.adaptar_jugadores_arena(rivales_ejemplo)
+        for rival in rivales_px:
+            rect_rival = pygame.Rect(rival["px"], rival["py"], TAMANO_CELDA, TAMANO_CELDA)
+            pygame.draw.rect(ventana, (255, 140, 0), rect_rival)
+            pygame.draw.rect(ventana, (255, 255, 255), rect_rival, 2)
+
+        dibujar_barra_inferior_deltarune(
+            ventana,
+            jugador_logico.nombre,
+            ataques_sufridos,
+            max_ataques_barra,
+            energia_extraida,
+            max_energia_barra,
+            celdas_obtenidas,
+            max_celdas_barra,
+        )
+
+        if motivo_game_over is not None:
+            transcurrido_go = ahora - tiempo_inicio_game_over
+            if transcurrido_go < duracion_game_over:
+                dibujar_anuncio_game_over(ventana, motivo_game_over, jugador_logico.nombre, ahora)
+            else:
+                if not partida.resultados_finales:
+                    partida.resultados_finales = [
+                        {
+                            "id_jugador": j.id_jugador,
+                            "nombre": j.nombre,
+                            "puntos": j.puntos,
+                        }
+                        for j in sorted(
+                            partida.jugadores,
+                            key=lambda j: (-j.puntos, j.id_jugador),
+                        )
+                    ]
+                motivo_game_over = None
+                estado_juego = "VICTORIA"
+
+        if cliente_marcador is not None:  # US-017: marcador del servidor encima de todo
             dibujar_hud_marcador(
                 ventana, estado_marcador.copiar(), id_local=opciones.jugador
             )
-        else:
-            celdas.dibujar_marcador(ventana) #US-011: puntos y celdas
 
     elif estado_juego == "VICTORIA":
+        resultados_base = partida.resultados_finales or [
+            {
+                "id_jugador": j.id_jugador,
+                "nombre": j.nombre,
+                "puntos": j.puntos,
+            }
+            for j in sorted(partida.jugadores, key=lambda j: (-j.puntos, j.id_jugador))
+        ]
 
-        if cliente_marcador is not None:
+        if cliente_marcador is not None:  # US-017: resultados reales del servidor
             datos_reales, ganador_real = estado_marcador.datos_para_victoria()
             ceremonia_victoria(ventana, ganador_real, datos_reales)
         else:
-            # La pantalla con resultados ficticios SOLO se conserva como demo local.
-            ceremonia_victoria(ventana, ganador_partida, datos_jugadores_ejemplo)
-            fuente_demo = pygame.font.SysFont("Arial", 19, bold=True)
-            aviso_demo = fuente_demo.render("DEMO LOCAL - puntuaciones de ejemplo", True, (245, 195, 96))
-            ventana.blit(aviso_demo, (20, ALTO_PANTALLA - 42))
+            resultados_enriquecidos = []
+            for r in resultados_base:
+                copia = dict(r)
+                if copia.get("nombre", "").strip().upper() == str(jugador_logico.nombre).strip().upper():
+                    copia["energia"] = energia_extraida
+                    copia["celdas"] = celdas_obtenidas
+                    copia["golpes_sufridos"] = ataques_sufridos
+                    copia["vida"] = vida_jugador
+                resultados_enriquecidos.append(copia)
+
+            ganador_adaptado, stats_adaptados = adaptador.adaptar_resultados_victoria(
+                resultados_enriquecidos
+            )
+            ceremonia_victoria(ventana, ganador_adaptado, stats_adaptados)
+        
 
     #Aqui actualizo la pantalla
     pygame.display.flip()
