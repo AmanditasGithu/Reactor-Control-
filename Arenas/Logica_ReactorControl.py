@@ -4,8 +4,13 @@ import math #para los guardianes
 import os #Para las imagenes 
 import serial
 import time 
+import random
 from Adapter import AdaptadorEstadoBackend
-from Eventos_Especiales import FabricaEventosEscenario, EventoTransferenciaCeldasLab
+from Eventos_Especiales import (
+    FabricaEventosEscenario,
+    EventoTransferenciaCeldasLab,
+    EventoReduccionEnergiaMilitar,
+)
 pygame.init()
 
 
@@ -130,6 +135,8 @@ class Obstaculo:
             if self.tipo == "barrera":
                 if escenario_actual == "laboratorio_subterraneo" and USAR_IMAGENES_LAB:
                     superficie.blit(img_pared_lab, self.rect)
+                elif escenario_actual == "complejo_militar" and USAR_IMAGENES_MILITAR:
+                    superficie.blit(img_pared_militar, self.rect)
                 else:
                     superficie.blit(img_pared, self.rect)
             elif self.tipo == "trampa":
@@ -180,6 +187,28 @@ matriz_laboratorio_subterraneo = [
 MAPAS_ESCENARIOS = {
     "planta_industrial": matriz_mapa,
     "laboratorio_subterraneo": matriz_laboratorio_subterraneo,
+}
+
+matriz_complejo_militar = [
+    "####################################",
+    "#      C    #       T          G   #",
+    "# E  ####   #   ###########   ###  #",
+    "#              #    E              #",
+    "#  T    ####         #       ###   #",
+    "#      C       #    R         C    #",
+    "#  ####    ###         ###   ##### #",
+    "#              #         #         #",
+    "#  G   #####   #######   #####   G #",
+    "#                          T       #",
+    "#  E   #####   T         ######### #",
+    "#      C             #        E    #",
+    "####################################"
+]
+
+MAPAS_ESCENARIOS = {
+    "planta_industrial": matriz_mapa,
+    "laboratorio_subterraneo": matriz_laboratorio_subterraneo,
+    "complejo_militar": matriz_complejo_militar,
 }
 
 TAMANO_CELDA =20
@@ -242,6 +271,7 @@ USAR_IMAGENES_LAB = False
 USAR_IMAGEN_CELDA = False
 USAR_IMAGEN_TERMINAL = False
 USAR_IMAGENES_RIVALES = False
+USAR_IMAGENES_MILITAR = False
 
 try:
     img_jugador = pygame.transform.scale(
@@ -330,6 +360,27 @@ try:
     )
     USAR_IMAGENES_RIVALES = True
 
+    img_pared_militar = cargar_sprite_ajustado(
+    os.path.join(CARPETA_ASSETS, "paredmilitar.png"),
+    TAMANO_CELDA,
+)
+
+    img_piso_militar = cargar_sprite_ajustado(
+        os.path.join(CARPETA_ASSETS, "pisomilitar.png"),
+        TAMANO_CELDA,
+    )
+
+    img_reactor_militar = cargar_sprite_ajustado(
+        os.path.join(CARPETA_ASSETS, "reactormilitar.png"),
+        TAMANO_CELDA,
+    )
+
+    img_celda_militar = cargar_sprite_ajustado(
+        os.path.join(CARPETA_ASSETS, "celdamilitar.png"),
+        TAMANO_CELDA,
+    )
+    USAR_IMAGENES_MILITAR = True
+
     USAR_IMAGENES = True
     print("Imagenes cargadas correctamente")
 
@@ -340,6 +391,7 @@ except (pygame.error, FileNotFoundError) as e:
     USAR_IMAGEN_CELDA = False
     USAR_IMAGEN_TERMINAL = False
     USAR_IMAGENES_RIVALES = False
+    USAR_IMAGENES_MILITAR = False
 
 ###Imagenes de pantalla de victoria##
 try:
@@ -419,6 +471,8 @@ def cargar_Mapa(matriz):
 
 def dibujar_mapa(superficie, matriz):
     es_lab = escenario_actual == "laboratorio_subterraneo" and USAR_IMAGENES_LAB
+    es_militar = escenario_actual == "complejo_militar" and USAR_IMAGENES_MILITAR
+
     for fila_idx, fila in enumerate(matriz):
         for col_idx, caracter in enumerate(fila):
             x = OFFSET_X + col_idx * TAMANO_CELDA
@@ -427,9 +481,18 @@ def dibujar_mapa(superficie, matriz):
             celda_rect = pygame.Rect(x, y, TAMANO_CELDA, TAMANO_CELDA)
 
             if USAR_IMAGENES:
-                piso_actual = img_piso_lab if es_lab else img_piso
-                pared_actual = img_pared_lab if es_lab else img_pared
-                reactor_actual = img_reactor_lab if es_lab else img_reactor
+                if es_lab:
+                    piso_actual = img_piso_lab
+                    pared_actual = img_pared_lab
+                    reactor_actual = img_reactor_lab
+                elif es_militar:
+                    piso_actual = img_piso_militar
+                    pared_actual = img_pared_militar
+                    reactor_actual = img_reactor_militar
+                else:
+                    piso_actual = img_piso
+                    pared_actual = img_pared
+                    reactor_actual = img_reactor
 
                 superficie.blit(piso_actual, celda_rect)
 
@@ -440,12 +503,14 @@ def dibujar_mapa(superficie, matriz):
                 elif caracter == "R":
                     superficie.blit(reactor_actual, celda_rect)
 
-            if not es_lab:
+            if not es_lab and not es_militar:
                 pygame.draw.rect(superficie, (65, 75, 90), celda_rect, 1)
 
     for celda_rect_item in celdas_energia:
-        if es_lab and USAR_IMAGENES_LAB:
+        if es_lab:
             superficie.blit(img_celda_lab, celda_rect_item)
+        elif es_militar:
+            superficie.blit(img_celda_militar, celda_rect_item)
         elif USAR_IMAGEN_CELDA:
             superficie.blit(img_celda, celda_rect_item)
         else:
@@ -481,8 +546,47 @@ def seleccionar_escenario(nombre_escenario):
     print(f"Escenario cargado: {escenario_actual}")
 
 
+##Esto es para la ceremonia de victoria con confetti y eso
+class ParticulaConfeti:
+    def __init__(self, ancho, alto):
+        self.ancho = ancho
+        self.alto = alto
+        self.colores = [
+            (255, 215, 0),   # corado
+            (0, 225, 255),   # verde agua
+            (80, 255, 130),  # verde
+            (255, 80, 120),  # rosita
+            (255, 150, 40),  # anaranjado
+        ]
+        self.reiniciar(aleatorio_y=True)
 
-def ceremonia_victoria(superficie,ganador,datos_jugadores):
+    def reiniciar(self, aleatorio_y=False):
+        self.x = random.uniform(0, self.ancho)
+        self.y = random.uniform(-self.alto, 0) if aleatorio_y else random.uniform(-40, -10)
+        self.vel_y = random.uniform(2.0, 5.5)
+        self.vel_x = random.uniform(-1.5, 1.5)
+        self.tam_w = random.randint(7, 13)
+        self.tam_h = random.randint(5, 10)
+        self.color = random.choice(self.colores)
+        self.fase = random.uniform(0, math.pi * 2)
+
+    def actualizar(self, ahora):
+        self.y += self.vel_y
+        self.x += self.vel_x + math.sin(ahora * 5 + self.fase) * 0.8
+        if self.y > self.alto + 20 or self.x < -30 or self.x > self.ancho + 30:
+            self.reiniciar(aleatorio_y=False)
+
+    def dibujar(self, superficie):
+        pulso_alto = max(2, int(abs(math.cos(self.y * 0.04 + self.fase)) * self.tam_h))
+        rect = pygame.Rect(int(self.x), int(self.y), self.tam_w, pulso_alto)
+        pygame.draw.rect(superficie, self.color, rect, border_radius=2)
+
+
+confeti_victoria = [ParticulaConfeti(ANCHO_PANTALLA, ALTO_PANTALLA) for _ in range(90)]
+
+
+
+def ceremonia_victoria(superficie,ganador,datos_jugadores, ahora=0.0):
     if USAR_VICTORIA_VISUAL:
         superficie.blit(img_fondo_victoria, (0, 0))
     else:
@@ -533,6 +637,11 @@ def ceremonia_victoria(superficie,ganador,datos_jugadores):
                 pygame.transform.scale(img_verde_victoria, (360, 480)),
                 (centro_x - 180, centro_y - 150)
             )
+
+    for p in confeti_victoria:
+        p.actualizar(ahora)
+        p.dibujar(superficie)
+
 
     #Estas son las barras de puntaje programadas
     fuente_hud = pygame.font.SysFont("Arial", 20, bold=True)
@@ -746,6 +855,252 @@ motivo_game_over = None
 tiempo_inicio_game_over = 0.0
 duracion_game_over = 8.0 #Lo meti a 8 segundos porque se me quedaba un monton de tiempo en la pantalla de victoria 
 
+AUDIO_HABILITADO = False
+sonido_victoria_reproducido = False
+musica_victoria_ruta = os.path.join(CARPETA_ASSETS, "TheFinalCountdown.mp3")
+
+try:
+    if not pygame.mixer.get_init():
+        pygame.mixer.init()
+    AUDIO_HABILITADO = True
+except Exception as e:
+    print("Aviso de audio:", e)
+    AUDIO_HABILITADO = False
+
+
+######3Seccion de pantalla de eleccion de escenarios#####
+ESCENARIOS_MENU = [
+    {
+        "clave": "planta_industrial",
+        "titulo": "PLANTA INDUSTRIAL",
+        "dificultad": "FÁCIL",
+        "color": (80, 220, 140),
+        "desc": "Pulso del reactor y rutas directas.",
+    },
+    {
+        "clave": "laboratorio_subterraneo",
+        "titulo": "LABORATORIO SUBTERRÁNEO",
+        "dificultad": "MEDIO",
+        "color": (0, 205, 255),
+        "desc": "Transferencia de celdas y pasillos técnicos.",
+    },
+    {
+        "clave": "complejo_militar",
+        "titulo": "COMPLEJO MILITAR",
+        "dificultad": "DIFÍCIL",
+        "color": (255, 75, 95),
+        "desc": "4 guardianes y -50% de energía a mitad de partida.",
+    },
+]
+
+
+def dibujar_menu_escenarios(superficie, seleccionado_idx, ahora):
+    superficie.fill((14, 18, 28))
+
+    fuente_titulo = pygame.font.SysFont(["Courier New", "Consolas", "Arial Black"], 44, bold=True)
+    fuente_sub = pygame.font.SysFont("Arial", 20, bold=True)
+    fuente_card_titulo = pygame.font.SysFont(["Courier New", "Consolas", "Arial Black"], 22, bold=True)
+    fuente_desc = pygame.font.SysFont("Arial", 16)
+
+    txt_titulo = fuente_titulo.render("SELECCIONA EL ESCENARIO", True, (255, 255, 255))
+    superficie.blit(txt_titulo, (ANCHO_PANTALLA // 2 - txt_titulo.get_width() // 2, 65))
+
+    txt_ayuda = fuente_sub.render(
+        "Haz clic en un mapa o presiona [1] [2] [3]  •  [ENTER] para iniciar  •  [ESC] salir",
+        True,
+        (170, 185, 210),
+    )
+    superficie.blit(txt_ayuda, (ANCHO_PANTALLA // 2 - txt_ayuda.get_width() // 2, 122))
+
+    cantidad = len(ESCENARIOS_MENU)
+    margen_lateral = 60
+    espacio = 28
+    ancho_tarjeta = (ANCHO_PANTALLA - 2 * margen_lateral - espacio * (cantidad - 1)) // cantidad
+    alto_tarjeta = 280
+    y_tarjeta = (ALTO_PANTALLA - alto_tarjeta) // 2 + 15
+
+    pos_mouse = pygame.mouse.get_pos()
+    rects_tarjetas = []
+
+    for idx, item in enumerate(ESCENARIOS_MENU):
+        x_tarjeta = margen_lateral + idx * (ancho_tarjeta + espacio)
+        rect = pygame.Rect(x_tarjeta, y_tarjeta, ancho_tarjeta, alto_tarjeta)
+        hover = rect.collidepoint(pos_mouse)
+        activa = (idx == seleccionado_idx) or hover
+
+        pulso_y = int(math.sin(ahora * 6 + idx) * 3) if activa else 0
+        rect_dibujo = rect.move(0, pulso_y)
+
+        color_fondo = (28, 36, 54) if activa else (20, 25, 38)
+        grosor_borde = 4 if activa else 2
+
+        pygame.draw.rect(superficie, color_fondo, rect_dibujo, border_radius=12)
+        pygame.draw.rect(superficie, item["color"], rect_dibujo, grosor_borde, border_radius=12)
+
+        #Marca de dificultad
+        badge_rect = pygame.Rect(rect_dibujo.x + 18, rect_dibujo.y + 18, 125, 30)
+        pygame.draw.rect(superficie, item["color"], badge_rect, border_radius=6)
+        lbl_dif = fuente_sub.render(item["dificultad"], True, (12, 15, 22))
+        superficie.blit(lbl_dif, (badge_rect.centerx - lbl_dif.get_width() // 2, badge_rect.centery - lbl_dif.get_height() // 2))
+
+        #acceso rapido
+        lbl_num = fuente_sub.render(f"[{idx + 1}]", True, (220, 225, 240))
+        superficie.blit(lbl_num, (rect_dibujo.right - 48, rect_dibujo.y + 22))
+
+        #nombre del maapa
+        lbl_nombre = fuente_card_titulo.render(item["titulo"], True, (255, 255, 255))
+        superficie.blit(lbl_nombre, (rect_dibujo.x + 18, rect_dibujo.y + 75))
+
+        #descripcion del mapa
+        lbl_desc = fuente_desc.render(item["desc"], True, (205, 215, 230))
+        superficie.blit(lbl_desc, (rect_dibujo.x + 18, rect_dibujo.y + 125))
+
+        
+        btn_rect = pygame.Rect(rect_dibujo.x + 18, rect_dibujo.bottom - 56, ancho_tarjeta - 36, 38)
+        pygame.draw.rect(
+            superficie,
+            item["color"] if activa else (42, 50, 70),
+            btn_rect,
+            border_radius=8,
+        )
+        txt_btn = fuente_sub.render("JUGAR", True, (12, 15, 22) if activa else (235, 240, 255))
+        superficie.blit(txt_btn, (btn_rect.centerx - txt_btn.get_width() // 2, btn_rect.centery - txt_btn.get_height() // 2))
+
+        rects_tarjetas.append((rect, idx, item["clave"]))
+
+    return rects_tarjetas
+
+
+
+DURACION_CUENTA_REGRESIVA = 5.0
+DURACION_ANUNCIO_ENGAGE = 1.1
+
+tiempo_inicio_cuenta = 0.0
+tiempo_fin_engage = 0.0
+briefing_mision = "Se leal a tu nación y lucha contra las fuerzas robóticas, roba la energía de su reactor"
+
+
+def envolver_texto_retro(texto, fuente, ancho_maximo):
+    palabras = texto.split()
+    lineas = []
+    actual = ""
+    for palabra in palabras:
+        prueba = f"{actual} {palabra}".strip()
+        if fuente.size(prueba)[0] <= ancho_maximo:
+            actual = prueba
+        else:
+            if actual:
+                lineas.append(actual)
+            actual = palabra
+    if actual:
+        lineas.append(actual)
+    return lineas
+
+
+def dibujar_cuenta_regresiva_retro(superficie, restante, ahora):
+    superficie.fill((10, 13, 22))
+
+    #Lineas tipo retro
+    for y_scan in range(0, ALTO_PANTALLA, 6):
+        pygame.draw.line(superficie, (18, 24, 38), (0, y_scan), (ANCHO_PANTALLA, y_scan), 1)
+
+    fuente_tag = pygame.font.SysFont(["Courier New", "Consolas", "Arial Black"], 22, bold=True)
+    fuente_briefing = pygame.font.SysFont(["Courier New", "Consolas", "Arial Black"], 26, bold=True)
+    fuente_numero = pygame.font.SysFont(["Courier New", "Consolas", "Impact", "Arial Black"], 130, bold=True)
+    fuente_pie = pygame.font.SysFont(["Courier New", "Consolas", "Arial"], 18, bold=True)
+
+    #Marco principal
+    marco = pygame.Rect(48, 42, ANCHO_PANTALLA - 96, ALTO_PANTALLA - 84)
+    pygame.draw.rect(superficie, (16, 22, 36), marco, border_radius=12)
+    pygame.draw.rect(superficie, (0, 225, 255), marco, 4, border_radius=12)
+
+    lbl_tag = fuente_tag.render("DIRECTIVA DE MISIÓN", True, (255, 215, 0))
+    superficie.blit(lbl_tag, (ANCHO_PANTALLA // 2 - lbl_tag.get_width() // 2, marco.y + 26))
+
+    
+    lineas = envolver_texto_retro(briefing_mision, fuente_briefing, marco.width - 90)
+    y_linea = marco.y + 70
+    for linea in lineas:
+        surf_l = fuente_briefing.render(linea, True, (240, 248, 255))
+        superficie.blit(surf_l, (ANCHO_PANTALLA // 2 - surf_l.get_width() // 2, y_linea))
+        y_linea += surf_l.get_height() + 8
+
+    #Cuenta regresiva
+    numero_actual = max(1, min(5, int(math.ceil(restante))))
+    pulso_escala = 1.0 + 0.08 * abs(math.sin(ahora * math.pi * 2))
+    surf_num_base = fuente_numero.render(str(numero_actual), True, (255, 75, 110))
+    surf_num_sombra_base = fuente_numero.render(str(numero_actual), True, (25, 12, 24))
+
+    nuevo_w = int(surf_num_base.get_width() * pulso_escala)
+    nuevo_h = int(surf_num_base.get_height() * pulso_escala)
+    surf_num = pygame.transform.smoothscale(surf_num_base, (nuevo_w, nuevo_h))
+    surf_num_sombra = pygame.transform.smoothscale(surf_num_sombra_base, (nuevo_w, nuevo_h))
+
+    x_num = ANCHO_PANTALLA // 2 - surf_num.get_width() // 2
+    y_num = marco.centery - 15
+
+    superficie.blit(surf_num_sombra, (x_num + 6, y_num + 6))
+    superficie.blit(surf_num, (x_num, y_num))
+
+    lbl_pie = fuente_pie.render("PREPARANDO SISTEMAS...  [ENTER] SALTAR CONTEO", True, (150, 175, 205))
+    superficie.blit(lbl_pie, (ANCHO_PANTALLA // 2 - lbl_pie.get_width() // 2, marco.bottom - 44))
+
+
+def dibujar_anuncio_engage(superficie, ahora):
+    if ahora >= tiempo_fin_engage:
+        return
+
+    restante_eng = max(0.0, tiempo_fin_engage - ahora)
+    #Golpe inicial grande 
+    escala = 1.0 + (0.25 * (restante_eng / DURACION_ANUNCIO_ENGAGE))
+
+    fuente_eng = pygame.font.SysFont(["Courier New", "Consolas", "Impact", "Arial Black"], 112, bold=True)
+    surf_sombra_raw = fuente_eng.render("ENGAGE", True, (15, 15, 22))
+    surf_borde_raw = fuente_eng.render("ENGAGE", True, (255, 65, 85))
+    surf_texto_raw = fuente_eng.render("ENGAGE", True, (255, 220, 45))
+
+    w = int(surf_texto_raw.get_width() * escala)
+    h = int(surf_texto_raw.get_height() * escala)
+
+    surf_sombra = pygame.transform.smoothscale(surf_sombra_raw, (w, h))
+    surf_borde = pygame.transform.smoothscale(surf_borde_raw, (w, h))
+    surf_texto = pygame.transform.smoothscale(surf_texto_raw, (w, h))
+
+    cx = ANCHO_PANTALLA // 2 - w // 2
+    cy = ALTO_PANTALLA // 2 - h // 2
+
+    # Sombra y contorno grueso tipo Cuphead yayyaa
+    superficie.blit(surf_sombra, (cx + 8, cy + 8))
+    for dx, dy in ((-4, 0), (4, 0), (0, -4), (0, 4)):
+        superficie.blit(surf_borde, (cx + dx, cy + dy))
+    superficie.blit(surf_texto, (cx, cy))
+
+def activar_partida_con_engage(ahora):
+    global estado_juego, tiempo_fin_engage, partida
+    estado_juego = "JUGANDO"
+    tiempo_fin_engage = ahora + DURACION_ANUNCIO_ENGAGE
+    #Reinicia reloj de la partida
+    if hasattr(partida, "inicio"):
+        partida.inicio = ahora
+
+
+
+def iniciar_modo_jugando(escenario=None):
+    global estado_juego, sonido_victoria_reproducido, tiempo_inicio_cuenta, tiempo_fin_engage
+    if escenario:
+        seleccionar_escenario(escenario)
+    estado_juego = "CUENTA_REGRESIVA"
+    tiempo_inicio_cuenta = time.monotonic()
+    tiempo_fin_engage = 0.0
+    sonido_victoria_reproducido = False
+    if AUDIO_HABILITADO:
+        pygame.mixer.music.stop()
+
+
+estado_juego = "MENU_ESCENARIO"
+escenario_seleccionado_idx = 0
+rects_menu_escenarios = []
+
 
 
 
@@ -759,30 +1114,78 @@ while True:
             pygame.quit()
             sys.exit()
 
+        if evento.type == pygame.MOUSEBUTTONDOWN and evento.button == 1:
+            if estado_juego == "MENU_ESCENARIO":
+                for rect_t, idx_t, clave_t in rects_menu_escenarios:
+                    if rect_t.collidepoint(evento.pos):
+                        escenario_seleccionado_idx = idx_t
+                        iniciar_modo_jugando(clave_t)
+                        break
+
+
         if evento.type == pygame.KEYDOWN:
-
-
             if evento.key == pygame.K_ESCAPE:
                 pygame.quit()
                 sys.exit()
 
-            elif evento.key == pygame.K_1:
-                seleccionar_escenario("planta_industrial")
-                estado_juego = "JUGANDO"
-            elif evento.key == pygame.K_2:
-                seleccionar_escenario("laboratorio_subterraneo")
-                estado_juego = "JUGANDO"
 
-            #V alterna entre el mapa y la ceremonia
-            elif evento.key == pygame.K_v:
-                if estado_juego == "JUGANDO":
-                    estado_juego = "VICTORIA"
-                else:
-                    estado_juego = "JUGANDO"
-                
+
+            elif estado_juego == "MENU_ESCENARIO":
+                if evento.key in (pygame.K_LEFT, pygame.K_a):
+                    escenario_seleccionado_idx = (escenario_seleccionado_idx - 1) % len(ESCENARIOS_MENU)
+                elif evento.key in (pygame.K_RIGHT, pygame.K_d):
+                    escenario_seleccionado_idx = (escenario_seleccionado_idx + 1) % len(ESCENARIOS_MENU)
+                elif evento.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE):
+                    iniciar_modo_jugando(ESCENARIOS_MENU[escenario_seleccionado_idx]["clave"])
+                elif evento.key == pygame.K_1:
+                    iniciar_modo_jugando("planta_industrial")
+                elif evento.key == pygame.K_2:
+                    iniciar_modo_jugando("laboratorio_subterraneo")
+                elif evento.key == pygame.K_3:
+                    iniciar_modo_jugando("complejo_militar")
+            
+            elif estado_juego == "CUENTA_REGRESIVA":
+                if evento.key in (pygame.K_RETURN, pygame.K_KP_ENTER, pygame.K_SPACE):
+                    activar_partida_con_engage(time.monotonic())
+
+            else:
+                if evento.key == pygame.K_1:
+                    iniciar_modo_jugando("planta_industrial")
+                elif evento.key == pygame.K_2:
+                    iniciar_modo_jugando("laboratorio_subterraneo")
+                elif evento.key == pygame.K_3:
+                    iniciar_modo_jugando("complejo_militar")
+                elif evento.key == pygame.K_m:
+                    estado_juego = "MENU_ESCENARIO"
+                    sonido_victoria_reproducido = False
+                    if AUDIO_HABILITADO:
+                        pygame.mixer.music.stop()
+                elif evento.key == pygame.K_v:
+                    if estado_juego == "JUGANDO":
+                        sonido_victoria_reproducido = False
+                        estado_juego = "VICTORIA"
+                    else:
+                        iniciar_modo_jugando()
+            
 
     #OJO, Segun el estado es Jugando o Victoria alterno la pantalla
-    if estado_juego == "JUGANDO":
+    if estado_juego == "MENU_ESCENARIO":
+        rects_menu_escenarios = dibujar_menu_escenarios(
+            ventana,
+            escenario_seleccionado_idx,
+            time.monotonic(),
+        )
+
+    elif estado_juego == "CUENTA_REGRESIVA":
+      ahora = time.monotonic()
+      restante = DURACION_CUENTA_REGRESIVA - (ahora - tiempo_inicio_cuenta)
+      if restante <= 0:
+          activar_partida_con_engage(ahora)
+      else:
+          dibujar_cuenta_regresiva_retro(ventana, restante, ahora)
+
+
+    elif estado_juego == "JUGANDO":
         ahora = time.monotonic()
 
         ventana.fill((20, 25, 35))
@@ -907,7 +1310,10 @@ while True:
                 if evento_escenario.celdas_transferidas > 0:
                     celdas_obtenidas = 0
             else:
+                antes_activado = getattr(evento_escenario, "activado", False)
                 evento_escenario.actualizar(partida, jugador_logico, ahora)
+                if isinstance(evento_escenario, EventoReduccionEnergiaMilitar) and not antes_activado and evento_escenario.activado:
+                    energia_extraida = energia_extraida // 2
 
             anuncio_texto, anuncio_color = evento_escenario.obtener_anuncio(ahora)
 
@@ -989,9 +1395,22 @@ while True:
                         )
                     ]
                 motivo_game_over = None
+                sonido_victoria_reproducido = False
                 estado_juego = "VICTORIA"
 
+        dibujar_anuncio_engage(ventana, ahora)        
+
+
+
     elif estado_juego == "VICTORIA":
+
+        rects_menu_escenarios = []
+        if estado_juego == "MENU_ESCENARIO":
+            rects_menu_escenarios = dibujar_menu_escenarios(
+                ventana,
+                escenario_seleccionado_idx,
+                time.monotonic(),
+    )
         resultados_base = partida.resultados_finales or [
             {
                 "id_jugador": j.id_jugador,
@@ -1015,10 +1434,19 @@ while True:
         ganador_adaptado, stats_adaptados = adaptador.adaptar_resultados_victoria(
             resultados_enriquecidos
         )
-        ceremonia_victoria(ventana, ganador_adaptado, stats_adaptados)
-        
+        ceremonia_victoria(ventana, ganador_adaptado, stats_adaptados, ahora)
 
-    #Aqui actualizo la pantalla
+        if not sonido_victoria_reproducido:
+            sonido_victoria_reproducido = True
+            if AUDIO_HABILITADO and os.path.exists(musica_victoria_ruta):
+                try:
+                    pygame.mixer.music.load(musica_victoria_ruta)
+                    pygame.mixer.music.set_volume(0.4)
+                    pygame.mixer.music.play(loops=-1, start=13.0)
+                except Exception as e:
+                    print("No se pudo reproducir la musica de victoria:", e)
+
+    # Aqui actualizo la pantalla
     pygame.display.flip()
     reloj.tick(60)
 
