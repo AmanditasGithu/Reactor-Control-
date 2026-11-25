@@ -135,3 +135,43 @@ input:focus { outline: none; border-color: var(--cian); }
 .ranking li.yo { outline: 2px solid var(--cian); }
 
 .cargando { text-align: center; color: var(--gris); }
+
+/* ---------- US-024: jugar desde el celular ---------- */
+.unirse { flex-direction: row; align-items: flex-end; gap: 10px; margin-top: 14px; }
+.unirse label { flex: 1; min-width: 0; }
+.unirse input { width: 100%; min-width: 0; }
+.unirse .boton { width: auto; margin: 0; padding: 0 20px; }
+.partida-abierta { align-items: center; }
+.partida-abierta .enlace { padding: 4px; }
+
+#pantalla-jugar:has(#juego-arena:not([hidden])) { padding: 12px 10px; }
+.hud { display: flex; justify-content: space-between; gap: 6px; margin-bottom: 8px; font-size: 13px; color: var(--gris); }
+.hud b { color: var(--dorado); font-size: 16px; }
+#arena { display: block; margin: 0 auto; border-radius: 6px; touch-action: none; }
+.aviso-juego { min-height: 22px; margin: 6px 0 0; text-align: center; font-size: 14px; color: var(--cian); }
+
+.controles {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin: 6px 0 12px; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+.cruceta {
+  display: grid; grid-template-columns: repeat(3, 58px); grid-template-rows: repeat(3, 58px); gap: 4px;
+}
+.flecha {
+  font-size: 22px; color: var(--blanco); background: var(--panel-claro);
+  border: 2px solid var(--gris); border-radius: 10px; touch-action: none;
+}
+.flecha:active { background: var(--cian); color: var(--fondo); border-color: var(--cian); }
+.flecha--arriba { grid-column: 2; grid-row: 1; }
+.flecha--izquierda { grid-column: 1; grid-row: 2; }
+.flecha--derecha { grid-column: 3; grid-row: 2; }
+.flecha--abajo { grid-column: 2; grid-row: 3; }
+.extraer {
+  width: 120px; height: 120px; border-radius: 50%;
+  font: inherit; font-size: 12px; font-weight: 700; line-height: 1.3;
+  color: var(--fondo); background: var(--dorado); border: 4px solid var(--dorado);
+  box-shadow: 0 0 0 0 var(--dorado); touch-action: none;
+}
+.extraer.activo { background: var(--cian); border-color: var(--blanco); box-shadow: 0 0 18px var(--cian); }
+
+.ranking--juego li { padding: 8px 10px; margin-bottom: 6px; }

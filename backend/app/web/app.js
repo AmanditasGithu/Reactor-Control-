@@ -73,6 +73,10 @@ function mostrar(nombre, mensaje, exito = false) {
   if (nombre === "menu") $("#nombre-jugador").textContent = sesion.actual.jugador.nombre_usuario;
   if (nombre === "perfil") cargarPerfil();
   if (nombre === "ranking") cargarRanking();
+  // US-024: al entrar a Jugar se abre la sala de partidas; al salir se cierra la conexión
+  if (typeof juego !== "undefined") {
+    if (nombre === "jugar") juego.abrir(); else juego.cerrar();
+  }
   if (nombre === "recuperar") {
     $("#form-pedir-codigo").hidden = false;
     $("#form-nueva-contrasena").hidden = true;

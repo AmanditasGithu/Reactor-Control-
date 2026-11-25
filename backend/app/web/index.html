@@ -108,18 +108,66 @@
       <nav class="enlaces"><button class="enlace" data-ir="menu" type="button">Volver al menú</button></nav>
     </section>
 
-    <!-- Jugar -->
+    <!-- US-024: jugar desde el celular, conectado al servidor de partidas (puerto 8002) -->
     <section class="pantalla" id="pantalla-jugar" hidden>
-      <h1>Jugar</h1>
-      <div class="tarjeta">
-        <p>La arena se juega en la computadora, con el teclado o el control físico.</p>
-        <p>Desde el celular podés revisar tu perfil y el ranking en cualquier momento.</p>
+      <!-- Paso 1: crear o unirse a una partida -->
+      <div id="juego-sala">
+        <h1>Jugar</h1>
+        <button class="boton boton--principal" id="crear-partida" type="button">Crear partida nueva</button>
+        <form id="form-unirse" class="unirse" novalidate>
+          <label>Número de partida<input name="id_partida" inputmode="numeric" pattern="[0-9]*" autocomplete="off"></label>
+          <button class="boton" type="submit">Unirme</button>
+        </form>
+        <p class="mensaje" role="status"></p>
+        <h2>Partidas esperando jugadores</h2>
+        <ul class="lista" id="partidas-abiertas"></ul>
+        <nav class="enlaces"><button class="enlace" data-ir="menu" type="button">Volver al menú</button></nav>
       </div>
-      <nav class="enlaces"><button class="enlace" data-ir="menu" type="button">Volver al menú</button></nav>
+
+      <!-- Paso 2: esperar a los demás jugadores -->
+      <div id="juego-espera" hidden>
+        <h1>Partida <span id="espera-numero"></span></h1>
+        <p class="saludo">Pasale este número a los demás jugadores</p>
+        <ul class="lista" id="espera-jugadores"></ul>
+        <p class="mensaje" role="status"></p>
+        <button class="boton boton--principal" id="iniciar-partida" type="button">Iniciar partida</button>
+        <nav class="enlaces"><button class="enlace" id="salir-espera" type="button">Salir</button></nav>
+      </div>
+
+      <!-- Paso 3: la arena -->
+      <div id="juego-arena" hidden>
+        <div class="hud">
+          <span>Tiempo <b id="hud-tiempo">--</b></span>
+          <span>Meta <b id="hud-meta">--</b></span>
+          <span>Reactor <b id="hud-reactor">--</b></span>
+        </div>
+        <canvas id="arena" aria-label="Mapa de la partida"></canvas>
+        <p class="aviso-juego" id="aviso-juego" role="status"></p>
+        <div class="controles">
+          <div class="cruceta">
+            <button class="flecha flecha--arriba" data-direccion="ARRIBA" type="button" aria-label="Arriba">▲</button>
+            <button class="flecha flecha--izquierda" data-direccion="IZQUIERDA" type="button" aria-label="Izquierda">◀</button>
+            <button class="flecha flecha--derecha" data-direccion="DERECHA" type="button" aria-label="Derecha">▶</button>
+            <button class="flecha flecha--abajo" data-direccion="ABAJO" type="button" aria-label="Abajo">▼</button>
+          </div>
+          <button class="extraer" id="extraer" type="button">MANTENER<br>PARA<br>EXTRAER</button>
+        </div>
+        <ol class="ranking ranking--juego" id="marcador"></ol>
+      </div>
+
+      <!-- Paso 4: resultados -->
+      <div id="juego-fin" hidden>
+        <h1>Resultados</h1>
+        <p class="saludo" id="fin-motivo"></p>
+        <ol class="ranking" id="fin-resultados"></ol>
+        <button class="boton boton--principal" id="jugar-otra" type="button">Jugar otra partida</button>
+        <nav class="enlaces"><button class="enlace" data-ir="menu" type="button">Volver al menú</button></nav>
+      </div>
     </section>
 
     <p class="cargando" id="cargando" hidden>Cargando…</p>
   </main>
   <script src="app.js"></script>
+  <script src="juego.js"></script>
 </body>
 </html>
