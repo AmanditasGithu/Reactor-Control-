@@ -174,14 +174,14 @@ matriz_laboratorio_subterraneo = [
     "# C        #       T    G  #     C #",
     "#   ####   #   ###########   ###   #",
     "#      #       #         #     E   #",
-    "#  T   #####   #     #   #   ###   #",
-    "#      #       #    R    #         #",
+    "#  T   #####   #     #       ###   #",
+    "#      #       #    R              #",
     "#  C   #   #####   ###   #####   C #",
     "#      #       G             #     #",
     "#  #####   #########   #######   T #",
     "#          #       #               #",
     "#  E   #####   T   #   #########   #",
-    "#      C           #           C   #",
+    "#      C                       C   #",
     "####################################"
 ]
 MAPAS_ESCENARIOS = {
@@ -196,10 +196,10 @@ matriz_complejo_militar = [
     "#              #    E              #",
     "#  T    ####         #       ###   #",
     "#      C       #    R         C    #",
-    "#  ####    ###         ###   ##### #",
+    "#  ####    ###  G      ###   ##### #",
     "#              #         #         #",
     "#  G   #####   #######   #####   G #",
-    "#                          T       #",
+    "#                  G       T       #",
     "#  E   #####   T         ######### #",
     "#      C             #        E    #",
     "####################################"
@@ -1102,7 +1102,12 @@ escenario_seleccionado_idx = 0
 rects_menu_escenarios = []
 
 
+VENTANA_COMANDO_MOV = 0.07
+VENTANA_ACCION_SERIAL = 0.20
 
+ultimo_comando_mov = ""
+tiempo_ultimo_mov = 0.0
+tiempo_ultima_accion = 0.0
 
 
 
@@ -1193,18 +1198,26 @@ while True:
         teclas = pygame.key.get_pressed()
 
         ########COMANDOS DEL ARDUINO EN ESTE MOMENTO#########
-        comando_hardware = ""
-        if puerto_serial and puerto_serial.in_waiting>0:
+        if puerto_serial and puerto_serial.in_waiting > 0:
             try:
-                while puerto_serial.in_waiting > 0: ##Aqui le tuve que meter esto para que leyera las lineas acumuladas de golpe y se moviera rapido
-                    linea = puerto_serial.readline().decode('utf-8').strip()
-                    if linea in ["ARRIBA", "ABAJO", "IZQUIERDA", "DERECHA", "ACCION"]:
-                        comando_hardware = linea
+                while puerto_serial.in_waiting > 0:
+                    linea = puerto_serial.readline().decode("utf-8", errors="ignore").strip()
+                    if linea:
+                        print("SERIAL:", repr(linea))
+                    if linea in ("ARRIBA", "ABAJO", "IZQUIERDA", "DERECHA"):
+                        ultimo_comando_mov = linea
+                        tiempo_ultimo_mov = ahora
+                    elif linea == "ACCION":
+                        tiempo_ultima_accion = ahora
             except Exception:
                 pass
 
-
-
+        comando_hardware = (
+            ultimo_comando_mov
+            if (ultimo_comando_mov and (ahora - tiempo_ultimo_mov) <= VENTANA_COMANDO_MOV)
+            else ""
+        )
+        accion_hardware = (ahora - tiempo_ultima_accion) <= VENTANA_ACCION_SERIAL
         dibujar_mapa(ventana, matriz_activa)
  #Logica normal
         #Detectar si el jugador está en una trampa
@@ -1265,7 +1278,17 @@ while True:
 
 #####Logica para recargar y extraer energia dentro del reactor manteniedo E
         partida.reactor.recargar_si_corresponde(ahora)
-        if teclas[pygame.K_e] and partida.reactor.jugador_cerca(jugador_logico) and partida.reactor.energia_actual > 0:
+        extrayendo_input = teclas[pygame.K_e] or accion_hardware
+
+        if accion_hardware:
+            print(
+                "ACCION recibida | cerca:",
+                partida.reactor.jugador_cerca(jugador_logico),
+                "| energia_reactor:",
+                partida.reactor.energia_actual,
+            )
+
+        if extrayendo_input and partida.reactor.jugador_cerca(jugador_logico) and partida.reactor.energia_actual > 0:
             jugador_logico.extrayendo = True
             if ahora - jugador_logico.ultimo_ciclo_extraccion >= partida.reactor.intervalo:
                 extraido = partida.reactor.extraer(jugador_logico, ahora)
