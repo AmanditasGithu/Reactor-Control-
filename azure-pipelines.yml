@@ -1,0 +1,70 @@
+# Pipeline de Integración Continua (CI) - Control del Reactor
+# Corre las pruebas automáticas del backend y del frontend
+# y del servidor de partidas cada vez que se sube algo a develop o main, y en cada Pull Request.
+
+trigger:
+  branches:
+    include:
+      - develop
+      - main
+
+pr:
+  branches:
+    include:
+      - develop
+      - main
+
+pool:
+  vmImage: 'ubuntu-latest'
+
+steps:
+- task: UsePythonVersion@0
+  inputs:
+    versionSpec: '3.12'
+    addToPath: true
+  displayName: 'Configurar Python 3.12'
+
+# ---------- Backend (API de cuentas, login, ranking, acceso móvil) ----------
+- script: |
+    python -m pip install --upgrade pip
+    pip install -r requirements.txt
+  workingDirectory: backend
+  displayName: 'Backend: instalar dependencias'
+
+- script: python -m pytest --junitxml=$(Build.ArtifactStagingDirectory)/pruebas-backend.xml
+  workingDirectory: backend
+  displayName: 'Backend: correr pruebas'
+
+# ---------- Frontend (juego en Pygame, pantallas, celdas de energía) ----------
+- script: pip install -r requirements.txt
+  workingDirectory: frontend
+  displayName: 'Frontend: instalar dependencias'
+
+- script: python -m pytest --junitxml=$(Build.ArtifactStagingDirectory)/pruebas-frontend.xml
+  workingDirectory: frontend
+  displayName: 'Frontend: correr pruebas'
+
+# ---------- Servidor de partidas (bonificaciones, marcador, envío de resultados) ----------
+- script: |
+    pip install -r requirements.txt
+    python -m py_compile main.py api/*.py modelos/*.py servicios/*.py
+  workingDirectory: Logica-juego-backend
+  displayName: 'Servidor de partidas: instalar y revisar sintaxis'
+
+- script: |
+    if [ -d tests ]; then
+      python -m pytest tests --junitxml=$(Build.ArtifactStagingDirectory)/pruebas-partidas.xml
+    else
+      echo "Todavía no hay pruebas del servidor de partidas"
+    fi
+  workingDirectory: Logica-juego-backend
+  displayName: 'Servidor de partidas: correr pruebas'
+
+# ---------- Resultados ----------
+- task: PublishTestResults@2
+  condition: succeededOrFailed()
+  inputs:
+    testResultsFormat: 'JUnit'
+    testResultsFiles: '$(Build.ArtifactStagingDirectory)/pruebas-*.xml'
+    testRunTitle: 'Pruebas automáticas'
+  displayName: 'Publicar resultados de las pruebas'
