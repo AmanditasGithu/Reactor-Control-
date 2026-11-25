@@ -1,5 +1,6 @@
 name: CI Reactor Control
 
+# Corre en cada push a cualquier rama y en cada Pull Request a main o develop.
 on:
   push:
     branches: [ "**" ]
@@ -7,7 +8,7 @@ on:
     branches: [ main, develop ]
 
 jobs:
-  validar-python:
+  pruebas:
     runs-on: ubuntu-latest
 
     steps:
@@ -17,30 +18,27 @@ jobs:
       - name: Configurar Python
         uses: actions/setup-python@v5
         with:
-          python-version: "3.13"
+          python-version: "3.12"
 
-      - name: Instalar dependencias del sistema para Pygame
-        run: |
-          sudo apt-get update
-          sudo apt-get install -y libsdl2-dev libsdl2-image-dev libsdl2-mixer-dev libsdl2-ttf-dev
-
-      - name: Instalar dependencias de Python
+      - name: Instalar dependencias
         run: |
           python -m pip install --upgrade pip
-          if [ -f requirements.txt ]; then
-            pip install -r requirements.txt
-          else
-            pip install pygame pyserial pytest
-          fi
+          pip install -r backend/requirements.txt
+          pip install -r frontend/requirements.txt
+          pip install -r Logica-juego-backend/requirements.txt
 
-      - name: Verificar compilación de scripts Python
+      - name: Revisar que compilen las arenas y el juego
         run: |
-          python -m py_compile Arenas/*.py
+          python -m py_compile Arenas/*.py Logica_ReactorControl.py Adapter.py celdas_energia.py
 
-      - name: Ejecutar pruebas si existen
-        run: |
-          if ls test_*.py *_test.py Arenas/test_*.py Arenas/*_test.py 1> /dev/null 2>&1; then
-            pytest -v
-          else
-            echo "Sin tests unitarios; compilación verificada."
-          fi
+      - name: Pruebas del backend (cuentas, login, ranking, celular)
+        working-directory: backend
+        run: python -m pytest -v
+
+      - name: Pruebas del frontend (pantallas, juego, celdas de energía)
+        working-directory: frontend
+        run: python -m pytest -v
+
+      - name: Pruebas del servidor de partidas (bonificaciones, marcador, resultados)
+        working-directory: Logica-juego-backend
+        run: python -m pytest -v
