@@ -52,7 +52,7 @@ class Reactor:
 
         puntos = cantidad * self.puntos_por_energia
 
-        jugador.sumar_puntos(puntos)
+        jugador.sumar_puntos(puntos, ahora=ahora)
 
         if self.energia_actual == 0:
             self.proxima_recarga = (

@@ -131,6 +131,18 @@ class ClienteAPI:
             self.token = respuesta["access_token"]
         return respuesta
 
+    def obtener_historial(self, limite: int = 8, offset: int = 0) -> dict:
+        """US-023: devuelve una página de partidas del usuario autenticado."""
+        return self._enviar("GET", f"/api/historial?limite={limite}&offset={offset}")
+
+    def obtener_detalle_partida(self, id_partida: int) -> dict:
+        """US-023: detalle de una partida en la que participó el usuario."""
+        return self._enviar("GET", f"/api/historial/{id_partida}")
+
+    def obtener_records(self) -> list[dict]:
+        """US-023: mejores marcas guardadas del usuario."""
+        return self._enviar("GET", "/api/records")
+
     def cerrar_sesion(self) -> None:
         """Olvida el token. El jugador tiene que volver a iniciar sesión."""
         self.token = None

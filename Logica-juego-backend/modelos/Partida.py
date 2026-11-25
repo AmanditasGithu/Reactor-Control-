@@ -1,5 +1,7 @@
 import time
 import math
+from datetime import datetime, timezone
+from uuid import uuid4
 
 from modelos.Reactor import Reactor
 from modelos.Terminal import Terminal
@@ -12,6 +14,10 @@ class Partida:
             raise ValueError('La duración y la meta deben sier positivas')
         
         self.id_partida = id_partida
+        # UUID único: evita colisiones si el servidor se reinicia y la numeración vuelve a 1.
+        self.id_externo = uuid4().hex
+        self.fecha_inicio_utc = None
+        self.fecha_fin_utc = None
         self.jugadores = []
         self.reactor = Reactor()
         self.terminales = [
@@ -35,6 +41,16 @@ class Partida:
         self.resultados_finales = None
         self.ultimo_segundo_notificado = None
 
+        # US-012: un coleccionable visible a la vez, sin acumular multiplicadores.
+        self.bonificacion_disponible = None
+        self.proxima_bonificacion = None
+        self.siguiente_id_bonificacion = 1
+        self.indice_posicion_bonificacion = 0
+        self.espera_inicial_bonificacion = 8.0
+        self.intervalo_bonificaciones = 15.0
+        self.tiempo_en_mapa_bonificacion = 12.0
+        self.duracion_efecto_bonificacion = 8.0
+
         self.estado = "ESPERANDO"
     
     def agregar_jugador(self, jugador):
@@ -57,6 +73,8 @@ class Partida:
         
         self.estado = "JUGANDO"
         self.inicio_monotonico = time.monotonic()
+        self.fecha_inicio_utc = datetime.now(timezone.utc).isoformat()
+        self.proxima_bonificacion = self.inicio_monotonico + self.espera_inicial_bonificacion
         self.ultimo_segundo_notificado = math.ceil(self.duracion)
         
         return True
@@ -92,6 +110,7 @@ class Partida:
         self.tiempo_restante_final = self.tiempo_restante(ahora)
         self.motivo_fin = motivo
         self.estado = 'FINALIZADA'
+        self.fecha_fin_utc = datetime.now(timezone.utc).isoformat()
         
         for jugador in self.jugadores:
             jugador.extrayendo = False
@@ -111,4 +130,4 @@ class Partida:
         return True
     
     def obtener_jugadores(self):
-        return self.jugadores
+        return self.jugadores

@@ -4,6 +4,20 @@ import math #para los guardianes
 import os #Para las imagenes 
 import serial
 from celdas_energia import GestorCeldas  # US-011: celdas de energía
+import argparse
+from frontend.marcador_arena_us017 import EstadoMarcador, ClienteMarcadorArena
+from frontend.hud_arena_us017 import dibujar_hud_marcador
+
+# El cliente de cuentas y el servidor del juego son servicios DIFERENTES.
+# El id de partida y de jugador deben existir en Logica-juego-backend (8002).
+argumentos = argparse.ArgumentParser(description="Arena Pygame con marcador US-017")
+argumentos.add_argument("--partida", type=int, default=os.getenv("REACTOR_PARTIDA_ID"))
+argumentos.add_argument("--jugador", type=int, default=os.getenv("REACTOR_JUGADOR_ID"))
+argumentos.add_argument("--host", default=os.getenv("REACTOR_WS_HOST", "127.0.0.1:8002"))
+opciones = argumentos.parse_args()
+if bool(opciones.partida) != bool(opciones.jugador):
+    argumentos.error("Debes indicar ambos: --partida e --jugador")
+
 pygame.init()
 
 
@@ -414,7 +428,7 @@ def ceremonia_victoria(superficie,ganador,datos_jugadores):
                 (centro_x - 180, centro_y - 150)
             )
 
-        else:  #Gana el verde
+        elif ganador == "Verde":  # Gana el verde en la demo local
             superficie.blit(
                 pygame.transform.scale(img_azul_derrota, (240, 360)),
                 (centro_x - 390, centro_y - 100)
@@ -428,6 +442,12 @@ def ceremonia_victoria(superficie,ganador,datos_jugadores):
                 (centro_x - 180, centro_y - 150)
             )
 
+    # En modo conectado puede ganar un usuario con cualquier nombre, sin sprite de color.
+    fuente_ganador = pygame.font.SysFont("Arial", 32, bold=True)
+    leyenda = "EMPATE - RESULTADOS" if ganador is None else f"RESULTADOS: {str(ganador)[:24]}"
+    texto_ganador = fuente_ganador.render(leyenda, True, (255, 229, 132))
+    superficie.blit(texto_ganador, texto_ganador.get_rect(center=(centro_x, 110)))
+
     #Estas son las barras de puntaje programadas
     fuente_hud = pygame.font.SysFont("Arial", 20, bold=True)
     ancho_barra = min(250, (ANCHO_PANTALLA - 80) // 3)
@@ -436,7 +456,7 @@ def ceremonia_victoria(superficie,ganador,datos_jugadores):
     
     #Se dibujan las 3 barras por jugador para ver los stats
     rects_jugadores = []
-    for i, jg in enumerate(datos_jugadores):
+    for i, jg in enumerate(datos_jugadores[:3]):
         pos_x = separacion + i * (ancho_barra + separacion)
         pos_y = 30
 
@@ -462,9 +482,17 @@ def ceremonia_victoria(superficie,ganador,datos_jugadores):
 
             fuente_tip = pygame.font.SysFont("Arial", 14)
             t1 = fuente_tip.render(f"Jugador: {jg['nombre']}", True, (255, 255, 255))
-            t2 = fuente_tip.render(f"Energía Extraída: {jg.get('energia', 0)}", True, (200, 200, 200))
-            t3 = fuente_tip.render(f"Celdas Recogidas: {jg.get('celdas', 0)}", True, (200, 200, 200))
-            t4 = fuente_tip.render(f"Guardias Evitados: {jg.get('guardias', 0)}", True, (200, 200, 200))
+            # El servidor no comunica aún estadísticas individuales de energía/celdas/guardianes.
+            # No mostramos ceros inventados cuando usamos resultados reales.
+            t2 = fuente_tip.render(
+                f"Energía Extraída: {jg['energia']}" if 'energia' in jg else "Energía Extraída: sin dato",
+                True, (200, 200, 200))
+            t3 = fuente_tip.render(
+                f"Celdas Recogidas: {jg['celdas']}" if 'celdas' in jg else "Celdas Recogidas: sin dato",
+                True, (200, 200, 200))
+            t4 = fuente_tip.render(
+                f"Guardias Evitados: {jg['guardias']}" if 'guardias' in jg else "Guardias Evitados: sin dato",
+                True, (200, 200, 200))
 
             superficie.blit(t1, (tooltip_rect.x + 10, tooltip_rect.y + 10))
             superficie.blit(t2, (tooltip_rect.x + 10, tooltip_rect.y + 30))
@@ -492,23 +520,48 @@ datos_jugadores_ejemplo = [
 ganador_partida = "Azul"
 
 reloj = pygame.time.Clock()
-    
+
+# US-017: el cliente de marcador solo OBSERVA puntuaciones calculadas por el servidor.
+# En ausencia de parámetros, el juego local sigue funcionando sin red.
+estado_marcador = EstadoMarcador()
+cliente_marcador = None
+if opciones.partida and opciones.jugador:
+    direccion = opciones.host.removeprefix("ws://").removeprefix("wss://").rstrip("/")
+    esquema = "wss" if opciones.host.startswith("wss://") else "ws"
+    url_marcador = f"{esquema}://{direccion}/ws/partidas/{opciones.partida}/{opciones.jugador}"
+    cliente_marcador = ClienteMarcadorArena(url_marcador)
+    print(f"US-017: conectando marcador a {url_marcador}")
+else:
+    print("US-017: sin --partida/--jugador (arena en modo local)")
+
+
+def cerrar_juego():
+    if cliente_marcador is not None:
+        cliente_marcador.cerrar()
+    if puerto_serial is not None:
+        puerto_serial.close()
+    pygame.quit()
+    sys.exit()
+
 while True:
+    if cliente_marcador is not None:
+        cliente_marcador.procesar_pendientes(estado_marcador)
+        if estado_marcador.finalizada:
+            estado_juego = "VICTORIA"
+
     #Esto me permite procesar los elementos una vez 
     for evento in pygame.event.get():
 
         if evento.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
+            cerrar_juego()
 
         if evento.type == pygame.KEYDOWN:
 
             if evento.key == pygame.K_ESCAPE:
-                pygame.quit()
-                sys.exit()
+                cerrar_juego()
 
             #V alterna entre el mapa y la ceremonia
-            elif evento.key == pygame.K_v:
+            elif evento.key == pygame.K_v and cliente_marcador is None:
                 if estado_juego == "JUGANDO":
                     estado_juego = "VICTORIA"
                 else:
@@ -564,15 +617,24 @@ while True:
 
         #Dibujar jugador al final para que quede visible
         jugador.dibujar(ventana)
-        celdas.dibujar_marcador(ventana) #US-011: puntos y celdas
+        if cliente_marcador is not None:
+            dibujar_hud_marcador(
+                ventana, estado_marcador.copiar(), id_local=opciones.jugador
+            )
+        else:
+            celdas.dibujar_marcador(ventana) #US-011: puntos y celdas
 
     elif estado_juego == "VICTORIA":
 
-        ceremonia_victoria(
-            ventana,
-            ganador_partida,
-            datos_jugadores_ejemplo
-        )
+        if cliente_marcador is not None:
+            datos_reales, ganador_real = estado_marcador.datos_para_victoria()
+            ceremonia_victoria(ventana, ganador_real, datos_reales)
+        else:
+            # La pantalla con resultados ficticios SOLO se conserva como demo local.
+            ceremonia_victoria(ventana, ganador_partida, datos_jugadores_ejemplo)
+            fuente_demo = pygame.font.SysFont("Arial", 19, bold=True)
+            aviso_demo = fuente_demo.render("DEMO LOCAL - puntuaciones de ejemplo", True, (245, 195, 96))
+            ventana.blit(aviso_demo, (20, ALTO_PANTALLA - 42))
 
     #Aqui actualizo la pantalla
     pygame.display.flip()

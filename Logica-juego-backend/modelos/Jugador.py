@@ -1,3 +1,6 @@
+import time
+
+
 class Jugador:
 
     def __init__(self, id_jugador, nombre):
@@ -12,6 +15,7 @@ class Jugador:
 
         self.puntos = 0
         self.velocidad = 1
+        self.bonificacion_activa = None
 
     def mover(self, direccion):
         if direccion == "ARRIBA":
@@ -23,5 +27,15 @@ class Jugador:
         elif direccion == "IZQUIERDA":
             self.x -= self.velocidad
     
-    def sumar_puntos(self, cantidad):
-        self.puntos += cantidad
+    def sumar_puntos(self, cantidad, ahora=None):
+        """Aplica el multiplicador únicamente a recompensas positivas y vigentes."""
+        if ahora is None:
+            ahora = time.monotonic()
+        efecto = self.bonificacion_activa
+        multiplicador = (
+            efecto.multiplicador if cantidad > 0 and efecto is not None
+            and efecto.activo(ahora) else 1
+        )
+        ganados = int(cantidad * multiplicador)
+        self.puntos += ganados
+        return ganados

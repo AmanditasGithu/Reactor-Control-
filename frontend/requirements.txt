@@ -5,5 +5,8 @@ pygame-ce==2.5.8
 # Control físico (Arduino): lo usa Logica_ReactorControl.py
 pyserial==3.5
 
+# Marcador en tiempo real de la arena (US-017)
+websockets==17.3
+
 # Pruebas
 pytest==9.1.1

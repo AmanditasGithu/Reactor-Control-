@@ -3,7 +3,7 @@ import json
 from fastapi import APIRouter, WebSocket
 from starlette.websockets import WebSocketDisconnect
 
-from servicios.EstadoServidor import gestor, conexiones
+from servicios.EstadoServidor import gestor, conexiones, marcador
 
 router = APIRouter()
 
@@ -20,6 +20,9 @@ async def conectar_jugador(websocket: WebSocket, id_partida: int, id_jugador: in
         await conexiones.enviar_a_jugador(id_partida, id_jugador, {
             'tipo': 'estado', 'partida': gestor.obtener_estado(id_partida)
         })
+        await conexiones.enviar_a_jugador(
+            id_partida, id_jugador, marcador.evento_actual(gestor.obtener_estado(id_partida))
+        )
         await conexiones.enviar_a_partida(id_partida, {'tipo': 'jugador_conectado', 'id_jugador': id_jugador})
         while True:
             try:
@@ -44,6 +47,13 @@ async def conectar_jugador(websocket: WebSocket, id_partida: int, id_jugador: in
                 await conexiones.enviar_a_partida(id_partida, {
                     'tipo': 'estado', 'partida': resultado['estado']
                 })
+                await marcador.publicar_si_cambia(resultado['estado'], conexiones)
+
+                if resultado.get('bonificacion_recogida') is not None:
+                    await conexiones.enviar_a_partida(id_partida, {
+                        'tipo': 'bonificacion_recogida',
+                        **resultado['bonificacion_recogida'],
+                    })
 
                 if resultado['terminal_activada'] is not None:
                     await conexiones.enviar_a_partida(id_partida, {
@@ -56,4 +66,4 @@ async def conectar_jugador(websocket: WebSocket, id_partida: int, id_jugador: in
         pass
     finally:
         await conexiones.desconectar(id_partida, id_jugador, websocket)
-        await conexiones.enviar_a_partida(id_partida, {'tipo': 'jugador_desconectado', 'id_jugador': id_jugador})
+        await conexiones.enviar_a_partida(id_partida, {'tipo': 'jugador_desconectado', 'id_jugador': id_jugador})
