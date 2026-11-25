@@ -7,6 +7,8 @@ from servicios.EstadoServidor import gestor, conexiones, marcador
 
 router = APIRouter()
 
+SENALES_ACCION = {'ACCION_PRESIONAR', 'ACCION_LATIDO', 'ACCION_SOLTAR'}
+
 @router.websocket('/ws/partidas/{id_partida}/{id_jugador}')
 async def conectar_jugador(websocket: WebSocket, id_partida: int, id_jugador: int):
     if not gestor.jugador_en_partida(id_partida, id_jugador):
@@ -60,6 +62,20 @@ async def conectar_jugador(websocket: WebSocket, id_partida: int, id_jugador: in
                         'tipo': 'terminal_activada',
                         **resultado['terminal_activada']
                     })
+            elif datos.get('tipo') == 'accion':
+                # US-024: el botón EXTRAER del celular hace lo mismo que el control físico:
+                # ACCION_PRESIONAR al tocarlo, ACCION_LATIDO mientras se mantiene y ACCION_SOLTAR al soltarlo.
+                senal = datos.get('senal')
+                if senal not in SENALES_ACCION:
+                    await conexiones.enviar_a_jugador(id_partida, id_jugador, {'tipo': 'error', 'mensaje': 'Señal no válida'})
+                    continue
+                resultado = gestor.procesar_senal_accion(id_partida, id_jugador, senal)
+                if not resultado['ok'] and senal == 'ACCION_PRESIONAR':
+                    await conexiones.enviar_a_jugador(id_partida, id_jugador, {'tipo': 'aviso', 'mensaje': resultado['mensaje']})
+                if resultado['cambio']:
+                    estado = gestor.obtener_estado(id_partida)
+                    await conexiones.enviar_a_partida(id_partida, {'tipo': 'estado', 'partida': estado})
+                    await marcador.publicar_si_cambia(estado, conexiones)
             else:
                 await conexiones.enviar_a_jugador(id_partida, id_jugador, {'tipo': 'error', 'mensaje': 'Acción desconocida'})
     except WebSocketDisconnect:
