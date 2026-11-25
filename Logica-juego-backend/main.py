@@ -2,7 +2,10 @@ import asyncio
 
 from contextlib import asynccontextmanager, suppress
 import logging
+import os
+
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from api.RutasdePartida import router as rutas_partidas
 from api.RutasWebSocket import router as rutas_websocket
@@ -71,6 +74,16 @@ app = FastAPI(
     description = "API del juego multijugador",
     version = "1.0.0",
     lifespan = lifespan
+)
+
+# US-024: la versión para celular se abre desde el backend de cuentas (puerto 8000)
+# y llama a este servidor (puerto 8002). Sin esto el navegador bloquea esas llamadas.
+# ORIGENES_PERMITIDOS: direcciones separadas por coma; por defecto, cualquiera (red local).
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=[o.strip() for o in os.getenv("ORIGENES_PERMITIDOS", "*").split(",") if o.strip()],
+    allow_methods=["GET", "POST"],
+    allow_headers=["Content-Type"],
 )
 
 app.include_router(rutas_partidas)
