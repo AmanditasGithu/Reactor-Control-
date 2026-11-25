@@ -9,6 +9,12 @@
 #Este evento ocurre solo una vez en la partida
 #Transfiere el puntaje de todas las celdas de un jugador a otro
 
+
+#Evento de reduccion de energia para el complejo militar 
+#Este evento es exclusivo para el laboratorio subterraneo
+#Este evento ocurre solo una vez en la partida
+#La energia recaudada por los jugadores se reduce a la mitad
+
 class EventoPulsoReactor:
     def __init__(self, duracion_anuncio=4.5):
         self.duracion_anuncio = duracion_anuncio
@@ -98,6 +104,49 @@ class EventoTransferenciaCeldasLab:
             return self.mensaje_actual, self.color_borde
         return None, None
 
+class EventoReduccionEnergiaMilitar:
+    def __init__(self):
+        self.activado = False
+        self.tiempo_anuncio = 0.0
+        self.duracion_anuncio = 3.5
+        self.texto_anuncio = ""
+        self.color_anuncio = (255, 70, 70)
+
+    def actualizar(self, partida, jugador_logico, ahora):
+        if self.activado:
+            return
+
+        duracion_total = getattr(partida, "duracion", None) or getattr(partida, "tiempo_total", None)
+        restante = partida.tiempo_restante(ahora)
+
+        if duracion_total and duracion_total > 0:
+            mitad_alcanzada = restante <= (duracion_total * 0.5)
+        else:
+            if not hasattr(self, "_tiempo_inicial"):
+                self._tiempo_inicial = max(restante, 1.0)
+            mitad_alcanzada = restante <= (self._tiempo_inicial * 0.5)
+
+        if mitad_alcanzada:
+            self.activado = True
+            self.tiempo_anuncio = ahora
+            self.texto_anuncio = "¡CORTE TÁCTICO: -50% ENERGÍA!"
+            self.color_anuncio = (255, 65, 65)
+
+            # Reduce a la mitad la energia
+            for j in getattr(partida, "jugadores", []):
+                if hasattr(j, "energia"):
+                    j.energia = max(0, j.energia // 2)
+                if hasattr(j, "energia_extraida"):
+                    j.energia_extraida = max(0, j.energia_extraida // 2)
+
+            if hasattr(jugador_logico, "energia"):
+                jugador_logico.energia = max(0, jugador_logico.energia // 2)
+
+    def obtener_anuncio(self, ahora):
+        if self.texto_anuncio and (ahora - self.tiempo_anuncio) <= self.duracion_anuncio:
+            return self.texto_anuncio, self.color_anuncio
+        return None, None
+
 
 class FabricaEventosEscenario:
     @staticmethod
@@ -107,6 +156,8 @@ class FabricaEventosEscenario:
             return EventoPulsoReactor()
         if clave in ("laboratorio_subterraneo", "laboratorio", "subterraneo", "lab"):
             return EventoTransferenciaCeldasLab()
+        if clave in ("complejo_militar", "militar", "complejo"):
+            return EventoReduccionEnergiaMilitar()
         return None
 
 
