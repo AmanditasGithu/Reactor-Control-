@@ -182,3 +182,80 @@ class EstadoSocialResponse(BaseModel):
     access_token: str | None = None
     token_type: str = "bearer"
     jugador: JugadorResponse | None = None
+
+
+# --- US-023: historial, récords y recepción segura de resultados ---
+from typing import Literal
+from pydantic import model_validator
+
+
+class ResultadoJugadorEntrante(BaseModel):
+    id_jugador: int = Field(gt=0)
+    puntos: int = Field(ge=0)
+
+
+class FinalizacionEntrante(BaseModel):
+    id_externo: str = Field(pattern=r"^[0-9a-f]{32}$")
+    escenario: str = Field(default="laboratorio", min_length=1, max_length=50)
+    inicio_utc: datetime
+    fin_utc: datetime
+    duracion_segundos: int = Field(gt=0)
+    puntuacion_objetivo: int = Field(gt=0)
+    motivo_fin: Literal["TIEMPO", "PUNTUACION"]
+    resultados_finales: list[ResultadoJugadorEntrante] = Field(min_length=2)
+
+    @model_validator(mode="after")
+    def validar_resultados(self):
+        ids = [r.id_jugador for r in self.resultados_finales]
+        if len(ids) != len(set(ids)):
+            raise ValueError("Un jugador aparece dos veces en la misma partida")
+        if self.inicio_utc.tzinfo is None or self.fin_utc.tzinfo is None:
+            raise ValueError("Las fechas deben tener zona horaria")
+        if self.fin_utc < self.inicio_utc:
+            raise ValueError("La finalización no puede preceder al inicio")
+        if self.resultados_finales != sorted(
+            self.resultados_finales, key=lambda r: (-r.puntos, r.id_jugador)
+        ):
+            raise ValueError("Los resultados deben venir ordenados por puntos e identificador")
+        return self
+
+
+class ResultadoGuardadoResponse(BaseModel):
+    partida_id: int
+    duplicado: bool
+
+
+class HistorialFilaResponse(BaseModel):
+    partida_id: int
+    escenario: str
+    fecha: datetime | None
+    puntos: int
+    posicion: int | None
+    ganador_id: int | None
+    motivo_fin: str | None
+
+
+class HistorialPaginadoResponse(BaseModel):
+    total: int
+    limite: int
+    offset: int
+    partidas: list[HistorialFilaResponse]
+
+
+class ResultadoParticipanteResponse(BaseModel):
+    id_jugador: int
+    nombre_usuario: str
+    puntos: int
+    posicion: int | None
+
+
+class DetallePartidaResponse(BaseModel):
+    partida_id: int
+    escenario: str
+    fecha_inicio: datetime | None
+    fecha_fin: datetime | None
+    duracion_segundos: int
+    puntuacion_objetivo: int | None
+    motivo_fin: str | None
+    ganador_id: int | None
+    participantes: list[ResultadoParticipanteResponse]

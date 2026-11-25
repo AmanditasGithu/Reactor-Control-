@@ -1,7 +1,8 @@
 #Se utilizara el patron adapter para adecuar la interfaz backend del Sprint 2 y la interfaz grafica del juego y su logica
 import sys 
 import os 
-RUTA_BACKEND = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", "Logica-juego-backend"))
+# Logica-juego-backend está al lado de este archivo, en la raíz del repo
+RUTA_BACKEND = os.path.abspath(os.path.join(os.path.dirname(__file__), "Logica-juego-backend"))
 if RUTA_BACKEND not in sys.path:
     sys.path.append(RUTA_BACKEND)
 

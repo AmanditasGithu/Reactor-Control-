@@ -3,6 +3,7 @@ import math
 
 from threading import RLock
 from modelos.Partida import Partida
+from servicios.GestorBonificaciones import GestorBonificaciones
 
 class GestordePartida:
     TIEMPO_MAX_SIN_LATIDO = 1.5
@@ -12,6 +13,7 @@ class GestordePartida:
         self.siguiente_id = 1
         self.bloqueo = RLock()
         self._eventos_finalizacion = []
+        self.bonificaciones = GestorBonificaciones()
     
     def crear_partida(self):
         with self.bloqueo:
@@ -45,6 +47,9 @@ class GestordePartida:
 
     def _verificar_fin(self, partida, ahora=None):
         if partida.finalizar_si_corresponde(ahora):
+            partida.bonificacion_disponible = None
+            for jugador in partida.jugadores:
+                jugador.bonificacion_activa = None
             self._eventos_finalizacion.append(
                 (partida.id_partida, self._estado(partida))
             )
@@ -71,8 +76,14 @@ class GestordePartida:
             return bool(partida and self._jugador(partida, id_jugador))
 
     def _estado(self, partida, ahora= None):
+        if ahora is None:
+            ahora = time.monotonic()
+        disponible = partida.bonificacion_disponible
         return {
             'id_partida': partida.id_partida,
+            'id_externo': partida.id_externo,
+            'fecha_inicio_utc': partida.fecha_inicio_utc,
+            'fecha_fin_utc': partida.fecha_fin_utc,
             'estado': partida.estado,
             'duracion': partida.duracion,
             'puntuacion_objetivo': partida.meta,
@@ -82,9 +93,17 @@ class GestordePartida:
             'jugadores': [
                 {'id_jugador': j.id_jugador, 'nombre': j.nombre,
                  'x': j.x, 'y': j.y, 'puntos': j.puntos,
-                 'extrayendo': j.extrayendo}
+                 'extrayendo': j.extrayendo,
+                 'bonificacion': (j.bonificacion_activa.obtener_estado(ahora)
+                                  if j.bonificacion_activa and j.bonificacion_activa.activo(ahora)
+                                  else None)}
                 for j in partida.jugadores
             ],
+            'bonificacion_disponible': (
+                disponible.obtener_estado(ahora)
+                if disponible is not None and ahora < disponible.caduca_en
+                else None
+            ),
             'reactor': partida.reactor.obtener_estado(),
             'terminales': [
                 terminal.obtener_estado() for terminal in partida.terminales
@@ -118,16 +137,22 @@ class GestordePartida:
             if not jugador or jugador.extrayendo:
                 return {'ok': False, 'terminal_activada': None}
             
+            ahora = time.monotonic()
+            self.bonificaciones.actualizar(partida, ahora)
             jugador.mover(direccion)
+            bonificacion_recogida = self.bonificaciones.intentar_recoger(
+                partida, jugador, ahora
+            )
 
             terminal_activada = None
             
             for terminal in partida.terminales:
-                if terminal.activar(jugador):
+                puntos_antes = jugador.puntos
+                if terminal.activar(jugador, ahora=ahora):
                     terminal_activada = {
                         'id_terminal': terminal.id_terminal,
                         'id_jugador': jugador.id_jugador,
-                        'puntos_obtenidos': terminal.puntos
+                        'puntos_obtenidos': jugador.puntos - puntos_antes
                     }
                     
                     break
@@ -136,7 +161,8 @@ class GestordePartida:
             return {
                 'ok': True,
                 'terminal_activada': terminal_activada,
-                'estado': self._estado(partida),
+                'bonificacion_recogida': bonificacion_recogida,
+                'estado': self._estado(partida, ahora),
             }
     
     def mover_jugador(self, id_partida, id_jugador, direccion):
@@ -209,7 +235,8 @@ class GestordePartida:
                     continue
 
                 reactor = partida.reactor
-                cambio = reactor.recargar_si_corresponde(ahora)
+                cambio = self.bonificaciones.actualizar(partida, ahora)
+                cambio = reactor.recargar_si_corresponde(ahora) or cambio
                 for jugador in partida.jugadores:
                     if not jugador.extrayendo:
                         continue
@@ -254,4 +281,4 @@ class GestordePartida:
             if not jugador or not jugador.extrayendo:
                 return False
             jugador.extrayendo = False
-            return True
+            return True

@@ -30,6 +30,8 @@ services:
       GITHUB_CLIENT_ID: ${GITHUB_CLIENT_ID:-}
       GITHUB_CLIENT_SECRET: ${GITHUB_CLIENT_SECRET:-}
       URL_BACKEND: ${URL_BACKEND:-http://localhost:8000}
+      # Clave compartida con el servidor de partidas para recibir resultados (US-023)
+      REACTOR_RESULTADOS_TOKEN: ${REACTOR_RESULTADOS_TOKEN:-}
     ports:
       - "8000:8000"
     depends_on:
@@ -41,6 +43,9 @@ services:
     environment:
       # Clave que debe enviar el control físico en el encabezado x-control-token
       CONTROL_HARDWARE_TOKEN: ${CONTROL_HARDWARE_TOKEN:-}
+      # Envío de resultados al backend de cuentas (US-023)
+      REACTOR_RESULTADOS_TOKEN: ${REACTOR_RESULTADOS_TOKEN:-}
+      REACTOR_URL_RECEPCION_RESULTADOS: http://backend:8000/api/interno/resultados
     ports:
       - "8002:8002"
 

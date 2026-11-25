@@ -19,7 +19,7 @@ class Terminal:
             and jugador.y == self.y
         )
 
-    def activar(self, jugador):
+    def activar(self, jugador, ahora=None):
 
         if self.activada:
             return False
@@ -30,7 +30,7 @@ class Terminal:
         self.activada = True
         self.activada_por = jugador.id_jugador
 
-        jugador.sumar_puntos(self.puntos)
+        jugador.sumar_puntos(self.puntos, ahora=ahora)
 
         return True
 

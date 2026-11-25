@@ -3,6 +3,20 @@ import sys
 import math #para los guardianes 
 import os #Para las imagenes 
 import serial
+from celdas_energia import GestorCeldas  # US-011: celdas de energía
+import argparse
+from frontend.marcador_arena_us017 import EstadoMarcador, ClienteMarcadorArena
+from frontend.hud_arena_us017 import dibujar_hud_marcador
+
+# El cliente de cuentas y el servidor del juego son servicios DIFERENTES.
+# El id de partida y de jugador deben existir en Logica-juego-backend (8002).
+argumentos = argparse.ArgumentParser(description="Arena Pygame con marcador US-017")
+argumentos.add_argument("--partida", type=int, default=os.getenv("REACTOR_PARTIDA_ID"))
+argumentos.add_argument("--jugador", type=int, default=os.getenv("REACTOR_JUGADOR_ID"))
+argumentos.add_argument("--host", default=os.getenv("REACTOR_WS_HOST", "127.0.0.1:8002"))
+opciones = argumentos.parse_args()
+if bool(opciones.partida) != bool(opciones.jugador):
+    argumentos.error("Debes indicar ambos: --partida e --jugador")
 import time 
 from Adapter import AdaptadorEstadoBackend
 pygame.init()
@@ -360,6 +374,7 @@ def dibujar_mapa(superficie, matriz):
 
 
 cargar_Mapa(matriz_mapa)
+celdas = GestorCeldas(matriz_mapa, TAMANO_CELDA, OFFSET_X, OFFSET_Y)  # US-011: celdas de energía
 partida, jugador_logico = adaptador.crear_partida_integrada(
     coords_reactor[0], coords_reactor[1], coords_terminales
 )
@@ -404,7 +419,7 @@ def ceremonia_victoria(superficie,ganador,datos_jugadores):
                 (centro_x - 180, centro_y - 150)
             )
 
-        else:  #Gana el verde
+        elif ganador == "Verde":  # Gana el verde en la demo local
             superficie.blit(
                 pygame.transform.scale(img_azul_derrota, (240, 360)),
                 (centro_x - 390, centro_y - 100)
@@ -418,6 +433,12 @@ def ceremonia_victoria(superficie,ganador,datos_jugadores):
                 (centro_x - 180, centro_y - 150)
             )
 
+    # En modo conectado puede ganar un usuario con cualquier nombre, sin sprite de color.
+    fuente_ganador = pygame.font.SysFont("Arial", 32, bold=True)
+    leyenda = "EMPATE - RESULTADOS" if ganador is None else f"RESULTADOS: {str(ganador)[:24]}"
+    texto_ganador = fuente_ganador.render(leyenda, True, (255, 229, 132))
+    superficie.blit(texto_ganador, texto_ganador.get_rect(center=(centro_x, 110)))
+
     #Estas son las barras de puntaje programadas
     fuente_hud = pygame.font.SysFont("Arial", 20, bold=True)
     ancho_barra = min(250, (ANCHO_PANTALLA - 80) // 3)
@@ -426,7 +447,7 @@ def ceremonia_victoria(superficie,ganador,datos_jugadores):
     
     #Se dibujan las 3 barras por jugador para ver los stats
     rects_jugadores = []
-    for i, jg in enumerate(datos_jugadores):
+    for i, jg in enumerate(datos_jugadores[:3]):
         pos_x = separacion + i * (ancho_barra + separacion)
         pos_y = 30
 
@@ -603,6 +624,27 @@ ganador_partida = "Azul"
 
 reloj = pygame.time.Clock()
 
+# US-017: el cliente de marcador solo OBSERVA puntuaciones calculadas por el servidor.
+# En ausencia de parámetros, el juego local sigue funcionando sin red.
+estado_marcador = EstadoMarcador()
+cliente_marcador = None
+if opciones.partida and opciones.jugador:
+    direccion = opciones.host.removeprefix("ws://").removeprefix("wss://").rstrip("/")
+    esquema = "wss" if opciones.host.startswith("wss://") else "ws"
+    url_marcador = f"{esquema}://{direccion}/ws/partidas/{opciones.partida}/{opciones.jugador}"
+    cliente_marcador = ClienteMarcadorArena(url_marcador)
+    print(f"US-017: conectando marcador a {url_marcador}")
+else:
+    print("US-017: sin --partida/--jugador (arena en modo local)")
+
+
+def cerrar_juego():
+    if cliente_marcador is not None:
+        cliente_marcador.cerrar()
+    if puerto_serial is not None:
+        puerto_serial.close()
+    pygame.quit()
+    sys.exit()
 vida_jugador = 100
 vida_maxima = 100
 ultimo_golpe_guardian = 0.0
@@ -641,21 +683,24 @@ duracion_game_over = 8.0 #Lo meti a 8 segundos porque se me quedaba un monton de
 
 
 while True:
+    if cliente_marcador is not None:
+        cliente_marcador.procesar_pendientes(estado_marcador)
+        if estado_marcador.finalizada:
+            estado_juego = "VICTORIA"
+
     #Esto me permite procesar los elementos una vez 
     for evento in pygame.event.get():
 
         if evento.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
+            cerrar_juego()
 
         if evento.type == pygame.KEYDOWN:
 
             if evento.key == pygame.K_ESCAPE:
-                pygame.quit()
-                sys.exit()
+                cerrar_juego()
 
             #V alterna entre el mapa y la ceremonia
-            elif evento.key == pygame.K_v:
+            elif evento.key == pygame.K_v and cliente_marcador is None:
                 if estado_juego == "JUGANDO":
                     estado_juego = "VICTORIA"
                 else:
@@ -683,6 +728,7 @@ while True:
 
 
         dibujar_mapa(ventana, matriz_mapa)
+        celdas.dibujar(ventana)  # US-011
  #Logica normal
         #Detectar si el jugador está en una trampa
         en_trampa = any(
@@ -698,6 +744,7 @@ while True:
 
         #Actualizar al jugador
         jugador.Mover(teclas, comando_hardware, obstaculos)
+        jugador_logico.puntos += celdas.actualizar(jugador.rect)  # US-011: cada celda suma 10 puntos
 
         #Actualizar y dibujar guardianes
         for guardian in guardianes:
@@ -832,6 +879,11 @@ while True:
                 motivo_game_over = None
                 estado_juego = "VICTORIA"
 
+        if cliente_marcador is not None:  # US-017: marcador del servidor encima de todo
+            dibujar_hud_marcador(
+                ventana, estado_marcador.copiar(), id_local=opciones.jugador
+            )
+
     elif estado_juego == "VICTORIA":
         resultados_base = partida.resultados_finales or [
             {
@@ -842,20 +894,24 @@ while True:
             for j in sorted(partida.jugadores, key=lambda j: (-j.puntos, j.id_jugador))
         ]
 
-        resultados_enriquecidos = []
-        for r in resultados_base:
-            copia = dict(r)
-            if copia.get("nombre", "").strip().upper() == str(jugador_logico.nombre).strip().upper():
-                copia["energia"] = energia_extraida
-                copia["celdas"] = celdas_obtenidas
-                copia["golpes_sufridos"] = ataques_sufridos
-                copia["vida"] = vida_jugador
-            resultados_enriquecidos.append(copia)
+        if cliente_marcador is not None:  # US-017: resultados reales del servidor
+            datos_reales, ganador_real = estado_marcador.datos_para_victoria()
+            ceremonia_victoria(ventana, ganador_real, datos_reales)
+        else:
+            resultados_enriquecidos = []
+            for r in resultados_base:
+                copia = dict(r)
+                if copia.get("nombre", "").strip().upper() == str(jugador_logico.nombre).strip().upper():
+                    copia["energia"] = energia_extraida
+                    copia["celdas"] = celdas_obtenidas
+                    copia["golpes_sufridos"] = ataques_sufridos
+                    copia["vida"] = vida_jugador
+                resultados_enriquecidos.append(copia)
 
-        ganador_adaptado, stats_adaptados = adaptador.adaptar_resultados_victoria(
-            resultados_enriquecidos
-        )
-        ceremonia_victoria(ventana, ganador_adaptado, stats_adaptados)
+            ganador_adaptado, stats_adaptados = adaptador.adaptar_resultados_victoria(
+                resultados_enriquecidos
+            )
+            ceremonia_victoria(ventana, ganador_adaptado, stats_adaptados)
         
 
     #Aqui actualizo la pantalla

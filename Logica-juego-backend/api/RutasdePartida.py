@@ -2,7 +2,7 @@ from fastapi import APIRouter, HTTPException, status
 from pydantic import BaseModel, Field
 
 from modelos.Jugador import Jugador
-from servicios.EstadoServidor import gestor, conexiones
+from servicios.EstadoServidor import gestor, conexiones, marcador
 
 router = APIRouter(prefix = "/partidas", tags = ["Partidas"])
 
@@ -119,8 +119,18 @@ async def iniciar_partida(id_partida: int):
     )
 
 
+    await marcador.publicar_si_cambia(gestor.obtener_estado(id_partida), conexiones)
+
     return {
         "mensaje": "Partida iniciada correctamente",
         "id_partida": id_partida,
         "estado": partida.estado
     }
+
+@router.get("/{id_partida}/estado")
+def consultar_estado_partida(id_partida: int):
+    """Estado completo de solo lectura para depuración/integración US-012."""
+    estado = gestor.obtener_estado(id_partida)
+    if estado is None:
+        raise HTTPException(status_code=404, detail="La partida no existe")
+    return estado

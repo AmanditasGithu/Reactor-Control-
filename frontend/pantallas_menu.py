@@ -25,7 +25,7 @@ def dibujar_centrado(ventana, fuente, texto, color, y) -> None:
 
 
 class PantallaMenu:
-    """Menú principal: Jugar, Mi perfil, Ranking y Cerrar sesión."""
+    """Menú principal: Jugar, Mi perfil, Historial, Ranking y Cerrar sesión."""
 
     def __init__(self, ventana, jugador: dict):
         self.ventana = ventana
@@ -35,19 +35,22 @@ class PantallaMenu:
         self.fuente_chica = pygame.font.SysFont("Arial", 16)
         ancho, alto = ventana.get_size()
         self.x = (ancho - ANCHO_PANEL) // 2
-        self.y_inicio = alto // 2 - 190
+        self.y_inicio = alto // 2 - 220
         y = self.y_inicio + 110
         self.boton_jugar = Boton(self.x, y, ANCHO_PANEL, "Jugar")
         self.boton_perfil = Boton(self.x, y + 60, ANCHO_PANEL, "Mi perfil", principal=False)
-        self.boton_ranking = Boton(self.x, y + 120, ANCHO_PANEL, "Ranking", principal=False)
-        self.boton_salir = Boton(self.x, y + 180, ANCHO_PANEL, "Cerrar sesión", principal=False)
-        self.botones = [self.boton_jugar, self.boton_perfil, self.boton_ranking, self.boton_salir]
+        self.boton_historial = Boton(self.x, y + 120, ANCHO_PANEL, "Historial y récords", principal=False)
+        self.boton_ranking = Boton(self.x, y + 180, ANCHO_PANEL, "Ranking", principal=False)
+        self.boton_salir = Boton(self.x, y + 240, ANCHO_PANEL, "Cerrar sesión", principal=False)
+        self.botones = [self.boton_jugar, self.boton_perfil, self.boton_historial, self.boton_ranking, self.boton_salir]
 
     def manejar_evento(self, evento):
         if self.boton_jugar.fue_presionado(evento):
             return "jugar"
         if self.boton_perfil.fue_presionado(evento):
             return "ir_a_perfil"
+        if self.boton_historial.fue_presionado(evento):
+            return "ir_a_historial"
         if self.boton_ranking.fue_presionado(evento):
             return "ir_a_ranking"
         if self.boton_salir.fue_presionado(evento):
@@ -156,6 +159,73 @@ class PantallaPerfil(PantallaConDatos):
             self.texto(f"Partida {partida['partida_id']}  ·  {partida['puntos']} pts  ·  {lugar}", x, y + 226 + i * 28)
 
 
+class PantallaHistorial(PantallaConDatos):
+    """US-023: historial paginado y mejores marcas de la cuenta autenticada."""
+
+    titulo = "Historial y récords"
+    TAM_PAGINA = 8
+
+    def __init__(self, ventana, cliente):
+        self.offset = 0
+        super().__init__(ventana, cliente)
+        medio = self.ancho_panel // 2
+        self.boton_anterior = Boton(self.x, self.y_inicio + 415, medio - 8, "Anterior", principal=False)
+        self.boton_siguiente = Boton(self.x + medio + 8, self.y_inicio + 415, medio - 8, "Siguiente", principal=False)
+
+    def cargar(self):
+        return {
+            "historial": self.cliente.obtener_historial(self.TAM_PAGINA, self.offset),
+            "records": self.cliente.obtener_records(),
+        }
+
+    def manejar_evento(self, evento):
+        accion = super().manejar_evento(evento)
+        if accion:
+            return accion
+        if self.error or not self.datos:
+            return None
+        historial = self.datos["historial"]
+        anterior = self.boton_anterior.fue_presionado(evento) or (
+            evento.type == pygame.KEYDOWN and evento.key == pygame.K_LEFT
+        )
+        siguiente = self.boton_siguiente.fue_presionado(evento) or (
+            evento.type == pygame.KEYDOWN and evento.key == pygame.K_RIGHT
+        )
+        if anterior and self.offset > 0:
+            self.offset = max(0, self.offset - self.TAM_PAGINA)
+        elif siguiente and self.offset + self.TAM_PAGINA < historial["total"]:
+            self.offset += self.TAM_PAGINA
+        else:
+            return None
+        try:
+            self.datos = self.cargar()
+            self.error = ""
+        except ErrorAPI as error:
+            self.error = error.mensaje
+        return None
+
+    def dibujar_contenido(self):
+        x, y = self.x, self.y_inicio + 86
+        records = self.datos["records"]
+        mejor = next((r["valor"] for r in records if r["tipo"] == "mayor_puntuacion"), None)
+        self.texto(f"Récord personal: {mejor if mejor is not None else '—'} puntos", x, y, DORADO)
+        historial = self.datos["historial"]
+        total = historial["total"]
+        self.texto(f"Partidas finalizadas: {total}", x, y + 38, CIAN, self.fuente_chica)
+        self.texto("Partida       Fecha                Puntos      Posición", x, y + 71, GRIS, self.fuente_chica)
+        if not historial["partidas"]:
+            self.texto("No tienes partidas registradas todavía.", x, y + 117, GRIS, self.fuente_chica)
+        for i, fila in enumerate(historial["partidas"]):
+            fecha = (fila["fecha"] or "")[:10]
+            puesto = f"#{fila['posicion']}" if fila["posicion"] is not None else "—"
+            contenido = f"{fila['partida_id']:<12} {fecha:<20} {fila['puntos']:<11} {puesto}"
+            self.texto(contenido, x, y + 103 + 29 * i, BLANCO, self.fuente_chica)
+        self.texto(f"Mostrando {self.offset + 1 if total else 0}–{min(total, self.offset + self.TAM_PAGINA)} de {total}",
+                   x, y + 352, GRIS, self.fuente_chica)
+        self.boton_anterior.dibujar(self.ventana, self.fuente_chica)
+        self.boton_siguiente.dibujar(self.ventana, self.fuente_chica)
+
+
 class PantallaRanking(PantallaConDatos):
     """US-022: top 10 histórico de jugadores."""
 
@@ -198,6 +268,8 @@ def ejecutar_menu(ventana, cliente: ClienteAPI, jugador: dict) -> str:
                 pantalla = PantallaPerfil(ventana, cliente)
             elif accion == "ir_a_ranking":
                 pantalla = PantallaRanking(ventana, cliente)
+            elif accion == "ir_a_historial":
+                pantalla = PantallaHistorial(ventana, cliente)
             elif accion == "volver":
                 pantalla = PantallaMenu(ventana, jugador)
             elif accion == "cerrar_sesion":

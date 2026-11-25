@@ -111,6 +111,21 @@ class Record(Base):
     jugador: Mapped[Jugador] = relationship(back_populates="records")
 
 
+class ResultadoRecibido(Base):
+    """Idempotencia del cierre recibido del servidor de partidas (US-023).
+
+    Tabla nueva: no exige modificar las tablas de la base de datos existentes.
+    """
+
+    __tablename__ = "resultados_recibidos"
+
+    id_externo: Mapped[str] = mapped_column(String(32), primary_key=True)
+    partida_id: Mapped[int] = mapped_column(ForeignKey("partidas.id"), unique=True)
+    huella: Mapped[str] = mapped_column(String(64))
+    motivo_fin: Mapped[str] = mapped_column(String(20))
+    fecha_recibido: Mapped[datetime] = mapped_column(DateTime(timezone=True), default=ahora)
+
+
 class CodigoRecuperacion(Base):
     """Código de 6 números para recuperar la contraseña (US-005).
 
