@@ -28,7 +28,8 @@ class GestorBonificaciones:
                 and partida.proxima_bonificacion is not None
                 and ahora >= partida.proxima_bonificacion):
             posiciones_ocupadas = {(j.x, j.y) for j in partida.jugadores}
-            libres = [p for p in self.POSICIONES if p not in posiciones_ocupadas]
+            posiciones = getattr(partida, 'posiciones_bonificacion', None) or self.POSICIONES
+            libres = [p for p in posiciones if p not in posiciones_ocupadas]
             if libres:
                 posicion = libres[partida.indice_posicion_bonificacion % len(libres)]
                 partida.indice_posicion_bonificacion += 1

@@ -6,14 +6,19 @@ from servicios.EstadoServidor import gestor, conexiones, marcador
 
 router = APIRouter(prefix = "/partidas", tags = ["Partidas"])
 
+class DatosNuevaPartida(BaseModel):
+    # Multijugador de la compu: escenario elegido al crear la partida (opcional)
+    escenario: str | None = Field(default=None, max_length=40)
+
+
 class DatosJugador(BaseModel):
     id_jugador: int = Field(gt=0)
     nombre: str = Field(min_length = 1, max_length = 50)
 
 @router.post("", status_code = status.HTTP_201_CREATED)
 
-def crear_partida():
-    partida = gestor.crear_partida()
+def crear_partida(datos: DatosNuevaPartida | None = None):
+    partida = gestor.crear_partida(escenario=datos.escenario if datos else None)
 
     return {
         "mensaje": "Partida creada correctamente",
@@ -54,6 +59,7 @@ def obtener_partida(id_partida: int):
     return {
         "id_partida": partida.id_partida,
         "estado": partida.estado,
+        "escenario": partida.escenario,
         "jugadores": jugadores
     }
 
