@@ -29,7 +29,12 @@ def test_si_no_termino_ninguna_partida_no_muestra_nada(tmp_path):
     assert juego.guardar_resultados(ClienteFalso(), tmp_path / "no-existe.jsonl") is None
 
 
-def test_sin_backend_avisa_que_no_se_guardo(tmp_path):
+def test_sin_backend_avisa_y_la_reintenta_despues(tmp_path):
     archivo = tmp_path / "resultados.jsonl"
     archivo.write_text(json.dumps({"puntos": 40}) + "\n")
-    assert juego.guardar_resultados(ClienteFalso(falla=True), archivo) == "No se pudo guardar la partida en el ranking"
+    mensaje = juego.guardar_resultados(ClienteFalso(falla=True), archivo)
+    assert mensaje == "No se pudo guardar la partida: sin backend"
+    assert archivo.exists()  # queda pendiente
+    cliente = ClienteFalso()
+    assert "+40 puntos" in juego.guardar_resultados(cliente, archivo)
+    assert not archivo.exists()
