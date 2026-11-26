@@ -9,12 +9,25 @@ import json
 import uuid
 from datetime import datetime, timedelta, timezone
 from Adapter import AdaptadorEstadoBackend
+from multijugador import SesionMultijugador  # multijugador: partida compartida en el servidor
 from Eventos_Especiales import (
     FabricaEventosEscenario,
     EventoTransferenciaCeldasLab,
     EventoReduccionEnergiaMilitar,
 )
 pygame.init()
+
+
+# Si el menú abrió la arena para una partida multijugador, esto la conecta al servidor de partidas.
+# Si no (modo solo), queda en None y la arena funciona como siempre.
+sesion_mp = SesionMultijugador.desde_entorno()
+
+
+def salir_del_juego():
+    if sesion_mp:
+        sesion_mp.cerrar()
+    pygame.quit()
+    sys.exit()
 
 
 def anotar_resultado_partida(partida, jugador_logico, motivo, ahora):
@@ -804,6 +817,10 @@ def dibujar_anuncio_game_over(superficie, motivo, nombre_jugador, ahora):
         titulo = "GAME OVER"
         subtitulo = "TIEMPO AGOTADO"
         color_borde = (255, 195, 0)
+    elif motivo == "PUNTUACION":  # multijugador: alguien llegó a la meta
+        titulo = "FIN DE LA PARTIDA"
+        subtitulo = "META ALCANZADA"
+        color_borde = (80, 255, 130)
     else:
         return
 
@@ -1138,6 +1155,18 @@ def iniciar_modo_jugando(escenario=None):
 
 estado_juego = "MENU_ESCENARIO"
 escenario_seleccionado_idx = 0
+
+if sesion_mp:
+    iniciar_modo_jugando(sesion_mp.escenario)
+    activar_partida_con_engage(time.monotonic())
+    jugador_logico.nombre = sesion_mp.nombre.upper()
+    sesion_mp.configurar_mapa(
+        coords_reactor,
+        coords_terminales,
+        [adaptador.pixeles_a_celda(c.x, c.y) for c in celdas_energia],
+        [(col, fila) for fila, linea in enumerate(matriz_activa)
+         for col, caracter in enumerate(linea) if caracter == " "],
+    )
 rects_menu_escenarios = []
 
 
@@ -1155,8 +1184,7 @@ while True:
     for evento in pygame.event.get():
 
         if evento.type == pygame.QUIT:
-            pygame.quit()
-            sys.exit()
+            salir_del_juego()
 
         if evento.type == pygame.MOUSEBUTTONDOWN and evento.button == 1:
             if estado_juego == "MENU_ESCENARIO":
@@ -1169,8 +1197,10 @@ while True:
 
         if evento.type == pygame.KEYDOWN:
             if evento.key == pygame.K_ESCAPE:
-                pygame.quit()
-                sys.exit()
+                salir_del_juego()
+
+            elif sesion_mp:
+                pass  # multijugador: el escenario lo eligió quien creó la partida
 
 
 
@@ -1231,6 +1261,8 @@ while True:
 
     elif estado_juego == "JUGANDO":
         ahora = time.monotonic()
+        if sesion_mp:
+            sesion_mp.procesar()
 
         ventana.fill((20, 25, 35))
 
@@ -1287,7 +1319,7 @@ while True:
                 jugador_logico.extrayendo = False
                 print(f"¡Golpe! Vida: {vida_jugador} | Puntos: {jugador_logico.puntos}")
 
-                if ataques_sufridos >= 5 or vida_jugador <= 0:
+                if not sesion_mp and (ataques_sufridos >= 5 or vida_jugador <= 0):
                     if motivo_game_over is None:
                         motivo_game_over = "GUARDIANES"
                         tiempo_inicio_game_over = ahora
@@ -1302,12 +1334,20 @@ while True:
 
         
         adaptador.sincronizar_jugador(jugador, jugador_logico) #Sincronizco las celdas y activo las terminales de energia
+        if sesion_mp:
+            sesion_mp.actualizar_posicion(jugador_logico.x, jugador_logico.y)
 
+        restantes_mp = sesion_mp.celdas_restantes() if sesion_mp else None
         for celda_item in celdas_energia[:]:
-            if jugador.rect.colliderect(celda_item):
+            if restantes_mp is not None and adaptador.pixeles_a_celda(celda_item.x, celda_item.y) not in restantes_mp:
+                celdas_energia.remove(celda_item)  # otro jugador ya la recogió
+            elif jugador.rect.colliderect(celda_item):
                 celdas_energia.remove(celda_item)
                 celdas_obtenidas += 1
-                jugador_logico.sumar_puntos(10)
+                if sesion_mp:
+                    sesion_mp.recoger_celda(*adaptador.pixeles_a_celda(celda_item.x, celda_item.y))
+                else:
+                    jugador_logico.sumar_puntos(10)
 
         for term in partida.terminales:
             estaba_activa = term.activada
@@ -1327,7 +1367,16 @@ while True:
                 partida.reactor.energia_actual,
             )
 
-        if extrayendo_input and partida.reactor.jugador_cerca(jugador_logico) and partida.reactor.energia_actual > 0:
+        if sesion_mp:
+            sesion_mp.extraer(extrayendo_input, ahora)
+            jugador_logico.extrayendo = sesion_mp.estoy_extrayendo()
+            activadas_mp = sesion_mp.terminales_activadas()
+            for term in partida.terminales:
+                term.activada = (term.x, term.y) in activadas_mp
+            jugador_logico.puntos = sesion_mp.mis_puntos()
+            reactor_mp = sesion_mp.reactor()
+            partida.reactor.energia_actual = reactor_mp.get("energia_actual", partida.reactor.energia_actual)
+        elif extrayendo_input and partida.reactor.jugador_cerca(jugador_logico) and partida.reactor.energia_actual > 0:
             jugador_logico.extrayendo = True
             if ahora - jugador_logico.ultimo_ciclo_extraccion >= partida.reactor.intervalo:
                 extraido = partida.reactor.extraer(jugador_logico, ahora)
@@ -1354,11 +1403,14 @@ while True:
                 pygame.draw.rect(ventana, color_term, rect_term, 3)
 
         texto_hud = fuente_hud.render(
-            f"Vida: {vida_jugador}/{vida_maxima} | Tiempo: {int(partida.tiempo_restante(ahora))}s | Puntos: {jugador_logico.puntos}/{partida.meta} | Reactor: {partida.reactor.energia_actual}/{partida.reactor.energia_maxima}",
+            f"Vida: {vida_jugador}/{vida_maxima} | Tiempo: {int(sesion_mp.tiempo_restante() if sesion_mp else partida.tiempo_restante(ahora))}s | Puntos: {jugador_logico.puntos}/{partida.meta} | Reactor: {partida.reactor.energia_actual}/{partida.reactor.energia_maxima}",
             True,
             BLANCO,
         )
         ventana.blit(texto_hud, (20, 15))
+        if sesion_mp and sesion_mp.aviso():
+            texto_red = fuente_hud.render(sesion_mp.aviso(), True, (255, 120, 120))
+            ventana.blit(texto_red, (20, 40))
 
         if evento_escenario:
             if isinstance(evento_escenario, EventoTransferenciaCeldasLab):
@@ -1405,15 +1457,17 @@ while True:
                 ventana.blit(superficie_texto, (pos_texto_x, pos_texto_y))
 
         # Fin automatico de la partida por tiempo 
-        if partida.finalizar_si_corresponde(ahora):
+        if (sesion_mp.finalizada if sesion_mp else partida.finalizar_si_corresponde(ahora)):
             if motivo_game_over is None:
-                motivo_game_over = "TIEMPO"
+                motivo_game_over = (sesion_mp.motivo_fin if sesion_mp else None) or "TIEMPO"
+                if sesion_mp:
+                    partida.resultados_finales = sesion_mp.resultados_para_victoria()[1]
                 tiempo_inicio_game_over = ahora
                 jugador_logico.extrayendo = False
 
 
         
-        rivales_px = adaptador.adaptar_jugadores_arena(rivales_ejemplo)
+        rivales_px = adaptador.adaptar_jugadores_arena(sesion_mp.rivales() if sesion_mp else rivales_ejemplo)
         for rival in rivales_px:
             rect_rival = pygame.Rect(rival["px"], rival["py"], TAMANO_CELDA, TAMANO_CELDA)
             nombre_rival = str(rival.get("nombre", "")).strip().upper()
@@ -1456,7 +1510,8 @@ while True:
                             key=lambda j: (-j.puntos, j.id_jugador),
                         )
                     ]
-                anotar_resultado_partida(partida, jugador_logico, motivo_game_over, ahora)  # perfil y ranking
+                if not sesion_mp:  # en multijugador el servidor de partidas guarda el resultado
+                    anotar_resultado_partida(partida, jugador_logico, motivo_game_over, ahora)  # perfil y ranking
                 motivo_game_over = None
                 sonido_victoria_reproducido = False
                 estado_juego = "VICTORIA"
@@ -1497,11 +1552,14 @@ while True:
         ganador_adaptado, stats_adaptados = adaptador.adaptar_resultados_victoria(
             resultados_enriquecidos
         )
+        if sesion_mp:
+            ganador_adaptado = sesion_mp.resultados_para_victoria()[0]
+            stats_adaptados = stats_adaptados[:3]
         ceremonia_victoria(ventana, ganador_adaptado, stats_adaptados, ahora)
 
         # Cómo salir de esta pantalla (la partida ya quedó anotada para el ranking)
         fuente_salida = pygame.font.SysFont("Arial", 18, bold=True)
-        texto_salida = fuente_salida.render("ESC: volver al menú  |  M: otro escenario", True, (255, 255, 255))
+        texto_salida = fuente_salida.render("ESC: volver al menú" if sesion_mp else "ESC: volver al menú  |  M: otro escenario", True, (255, 255, 255))
         caja_salida = texto_salida.get_rect(bottomright=(ventana.get_width() - 16, ventana.get_height() - 14)).inflate(20, 12)
         pygame.draw.rect(ventana, (15, 20, 30), caja_salida, border_radius=6)
         pygame.draw.rect(ventana, (255, 215, 0), caja_salida, 2, border_radius=6)
