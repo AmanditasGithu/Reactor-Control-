@@ -1,0 +1,177 @@
+/* Versión para celular (US-024): mismos colores que el juego en Pygame */
+:root {
+  --fondo: #141923;
+  --panel: #282d3c;
+  --panel-claro: #323848;
+  --dorado: #ffd700;
+  --cian: #00dcc8;
+  --blanco: #ffffff;
+  --gris: #969baa;
+  --rojo: #ff5a5a;
+  --verde: #5adc78;
+  --radio: 10px;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  background: var(--fondo);
+  color: var(--blanco);
+  font-family: system-ui, -apple-system, "Segoe UI", Roboto, Arial, sans-serif;
+  font-size: 16px;
+  -webkit-text-size-adjust: 100%;
+}
+
+.app {
+  max-width: 440px;
+  margin: 0 auto;
+  padding: max(20px, env(safe-area-inset-top)) 16px max(24px, env(safe-area-inset-bottom));
+  min-height: 100vh;
+}
+
+.marca {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  margin: 4px 0 20px;
+}
+.marca__nombre { color: var(--cian); font-size: 13px; letter-spacing: 0.12em; font-weight: 600; }
+.marca__reactor {
+  width: 14px; height: 14px; border-radius: 50%;
+  background: var(--dorado);
+  box-shadow: 0 0 10px var(--dorado);
+}
+
+.pantalla {
+  background: var(--panel);
+  border: 2px solid var(--dorado);
+  border-radius: var(--radio);
+  padding: 22px 18px;
+}
+
+h1 { margin: 0 0 18px; font-size: 26px; text-align: center; }
+h2 { margin: 22px 0 8px; font-size: 16px; color: var(--cian); }
+
+form { display: flex; flex-direction: column; gap: 14px; }
+
+label { display: flex; flex-direction: column; gap: 6px; font-size: 14px; color: var(--gris); }
+
+input {
+  font: inherit;
+  font-size: 16px; /* evita el zoom automático en iPhone */
+  color: var(--blanco);
+  background: var(--panel-claro);
+  border: 2px solid var(--gris);
+  border-radius: 8px;
+  padding: 12px;
+  min-height: 48px;
+}
+input:focus { outline: none; border-color: var(--cian); }
+
+.boton {
+  display: block;
+  width: 100%;
+  min-height: 50px;
+  margin-top: 10px;
+  font: inherit;
+  font-weight: 600;
+  color: var(--blanco);
+  background: transparent;
+  border: 2px solid var(--gris);
+  border-radius: 8px;
+  cursor: pointer;
+}
+.boton:active { transform: scale(0.98); }
+.boton--principal { background: var(--dorado); border-color: var(--dorado); color: var(--fondo); }
+.boton--social { border-color: var(--cian); }
+.boton--salir { border-color: var(--rojo); color: var(--rojo); }
+.boton:disabled { opacity: 0.6; cursor: wait; }
+
+.mensaje { min-height: 20px; margin: 0; font-size: 14px; text-align: center; color: var(--rojo); }
+.mensaje.exito { color: var(--verde); }
+
+.separador { display: flex; align-items: center; gap: 10px; margin: 18px 0 4px; color: var(--gris); font-size: 13px; }
+.separador::before, .separador::after { content: ""; flex: 1; height: 1px; background: var(--panel-claro); }
+
+.enlaces { display: flex; flex-wrap: wrap; justify-content: center; gap: 8px 18px; margin-top: 18px; }
+.enlace {
+  background: none; border: none; padding: 8px 4px;
+  font: inherit; font-size: 14px; color: var(--cian);
+  text-decoration: underline; cursor: pointer;
+}
+
+.saludo { margin: 0 0 4px; text-align: center; color: var(--gris); }
+.saludo strong { color: var(--dorado); }
+
+.tarjeta { background: var(--panel-claro); border-radius: 8px; padding: 14px; line-height: 1.5; }
+.tarjeta p { margin: 0 0 8px; }
+.tarjeta p:last-child { margin: 0; }
+.tarjeta .dato { color: var(--gris); font-size: 13px; }
+
+.estadisticas { display: grid; grid-template-columns: repeat(2, 1fr); gap: 10px; margin-top: 12px; }
+.estadistica { background: var(--panel-claro); border-radius: 8px; padding: 12px; text-align: center; }
+.estadistica b { display: block; font-size: 24px; color: var(--dorado); }
+.estadistica span { font-size: 13px; color: var(--gris); }
+
+.lista { list-style: none; margin: 0; padding: 0; }
+.lista li {
+  display: flex; justify-content: space-between; gap: 10px;
+  padding: 10px 0; border-bottom: 1px solid var(--panel-claro); font-size: 14px;
+}
+.lista li.vacio { color: var(--gris); justify-content: center; border: none; }
+
+.ranking { list-style: none; margin: 0; padding: 0; }
+.ranking li {
+  display: grid; grid-template-columns: 36px 1fr auto; align-items: center; gap: 10px;
+  padding: 12px 10px; margin-bottom: 8px; border-radius: 8px; background: var(--panel-claro);
+}
+.ranking .posicion { font-weight: 700; color: var(--cian); text-align: center; }
+.ranking li:nth-child(1) .posicion { color: var(--dorado); }
+.ranking .nombre { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.ranking .nombre small { display: block; color: var(--gris); font-size: 12px; }
+.ranking .puntos { font-weight: 700; color: var(--dorado); }
+.ranking li.yo { outline: 2px solid var(--cian); }
+
+.cargando { text-align: center; color: var(--gris); }
+
+/* ---------- US-024: jugar desde el celular ---------- */
+.unirse { flex-direction: row; align-items: flex-end; gap: 10px; margin-top: 14px; }
+.unirse label { flex: 1; min-width: 0; }
+.unirse input { width: 100%; min-width: 0; }
+.unirse .boton { width: auto; margin: 0; padding: 0 20px; }
+.partida-abierta { align-items: center; }
+.partida-abierta .enlace { padding: 4px; }
+
+#pantalla-jugar:has(#juego-arena:not([hidden])) { padding: 12px 10px; }
+.hud { display: flex; justify-content: space-between; gap: 6px; margin-bottom: 8px; font-size: 13px; color: var(--gris); }
+.hud b { color: var(--dorado); font-size: 16px; }
+#arena { display: block; margin: 0 auto; border-radius: 6px; touch-action: none; }
+.aviso-juego { min-height: 22px; margin: 6px 0 0; text-align: center; font-size: 14px; color: var(--cian); }
+
+.controles {
+  display: flex; align-items: center; justify-content: space-between; gap: 12px;
+  margin: 6px 0 12px; user-select: none; -webkit-user-select: none; -webkit-touch-callout: none;
+}
+.cruceta {
+  display: grid; grid-template-columns: repeat(3, 58px); grid-template-rows: repeat(3, 58px); gap: 4px;
+}
+.flecha {
+  font-size: 22px; color: var(--blanco); background: var(--panel-claro);
+  border: 2px solid var(--gris); border-radius: 10px; touch-action: none;
+}
+.flecha:active { background: var(--cian); color: var(--fondo); border-color: var(--cian); }
+.flecha--arriba { grid-column: 2; grid-row: 1; }
+.flecha--izquierda { grid-column: 1; grid-row: 2; }
+.flecha--derecha { grid-column: 3; grid-row: 2; }
+.flecha--abajo { grid-column: 2; grid-row: 3; }
+.extraer {
+  width: 120px; height: 120px; border-radius: 50%;
+  font: inherit; font-size: 12px; font-weight: 700; line-height: 1.3;
+  color: var(--fondo); background: var(--dorado); border: 4px solid var(--dorado);
+  box-shadow: 0 0 0 0 var(--dorado); touch-action: none;
+}
+.extraer.activo { background: var(--cian); border-color: var(--blanco); box-shadow: 0 0 18px var(--cian); }
+
+.ranking--juego li { padding: 8px 10px; margin-bottom: 6px; }

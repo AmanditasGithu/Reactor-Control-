@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+  <meta name="theme-color" content="#141923">
+  <title>Control del Reactor</title>
+  <link rel="stylesheet" href="estilos.css">
+</head>
+<body>
+  <main class="app">
+    <header class="marca">
+      <span class="marca__reactor" aria-hidden="true"></span>
+      <span class="marca__nombre">CONTROL DEL REACTOR</span>
+    </header>
+
+    <!-- US-004: iniciar sesión -->
+    <section class="pantalla" id="pantalla-login" hidden>
+      <h1>Iniciar sesión</h1>
+      <form id="form-login" novalidate>
+        <label>Usuario o correo<input name="usuario_o_correo" autocomplete="username" autocapitalize="none" required></label>
+        <label>Contraseña<input name="contrasena" type="password" autocomplete="current-password" required></label>
+        <p class="mensaje" role="status"></p>
+        <button class="boton boton--principal" type="submit">Entrar</button>
+      </form>
+      <div class="separador"><span>o</span></div>
+      <button class="boton boton--social" data-proveedor="google" type="button">Entrar con Google</button>
+      <button class="boton boton--social" data-proveedor="github" type="button">Entrar con GitHub</button>
+      <nav class="enlaces">
+        <button class="enlace" data-ir="registro" type="button">Crear una cuenta</button>
+        <button class="enlace" data-ir="recuperar" type="button">Olvidé mi contraseña</button>
+      </nav>
+    </section>
+
+    <!-- US-001: registro -->
+    <section class="pantalla" id="pantalla-registro" hidden>
+      <h1>Crear cuenta</h1>
+      <form id="form-registro" novalidate>
+        <label>Nombre de usuario<input name="nombre_usuario" autocomplete="username" autocapitalize="none" maxlength="30" required></label>
+        <label>Correo<input name="correo" type="email" autocomplete="email" autocapitalize="none" required></label>
+        <label>Contraseña (mínimo 8)<input name="contrasena" type="password" autocomplete="new-password" required></label>
+        <label>Confirmar contraseña<input name="confirmar" type="password" autocomplete="new-password" required></label>
+        <p class="mensaje" role="status"></p>
+        <button class="boton boton--principal" type="submit">Crear cuenta</button>
+      </form>
+      <nav class="enlaces"><button class="enlace" data-ir="login" type="button">Ya tengo cuenta</button></nav>
+    </section>
+
+    <!-- US-003: verificar correo -->
+    <section class="pantalla" id="pantalla-verificar" hidden>
+      <h1>Verificar correo</h1>
+      <form id="form-verificar" novalidate>
+        <label>Correo<input name="correo" type="email" autocapitalize="none" required></label>
+        <label>Código de 6 números<input name="codigo" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required></label>
+        <p class="mensaje" role="status"></p>
+        <button class="boton boton--principal" type="submit">Verificar</button>
+      </form>
+      <nav class="enlaces">
+        <button class="enlace" id="reenviar-codigo" type="button">Reenviar código</button>
+        <button class="enlace" data-ir="login" type="button">Más tarde</button>
+      </nav>
+    </section>
+
+    <!-- US-005: recuperar contraseña -->
+    <section class="pantalla" id="pantalla-recuperar" hidden>
+      <h1>Recuperar contraseña</h1>
+      <form id="form-pedir-codigo" novalidate>
+        <label>Correo de tu cuenta<input name="correo" type="email" autocapitalize="none" required></label>
+        <p class="mensaje" role="status"></p>
+        <button class="boton boton--principal" type="submit">Enviar código</button>
+      </form>
+      <form id="form-nueva-contrasena" novalidate hidden>
+        <label>Código de 6 números<input name="codigo" inputmode="numeric" maxlength="6" autocomplete="one-time-code" required></label>
+        <label>Contraseña nueva (mínimo 8)<input name="contrasena_nueva" type="password" autocomplete="new-password" required></label>
+        <label>Confirmar contraseña<input name="confirmar" type="password" autocomplete="new-password" required></label>
+        <p class="mensaje" role="status"></p>
+        <button class="boton boton--principal" type="submit">Cambiar contraseña</button>
+      </form>
+      <nav class="enlaces"><button class="enlace" data-ir="login" type="button">Volver</button></nav>
+    </section>
+
+    <!-- Menú principal -->
+    <section class="pantalla" id="pantalla-menu" hidden>
+      <p class="saludo">Hola, <strong id="nombre-jugador"></strong></p>
+      <h1>Menú</h1>
+      <button class="boton boton--principal" data-ir="jugar" type="button">Jugar</button>
+      <button class="boton" data-ir="perfil" type="button">Mi perfil</button>
+      <button class="boton" data-ir="ranking" type="button">Ranking global</button>
+      <button class="boton boton--salir" id="cerrar-sesion" type="button">Cerrar sesión</button>
+    </section>
+
+    <!-- US-006: perfil -->
+    <section class="pantalla" id="pantalla-perfil" hidden>
+      <h1>Mi perfil</h1>
+      <div class="tarjeta" id="perfil-datos"></div>
+      <div class="estadisticas" id="perfil-estadisticas"></div>
+      <h2>Últimas partidas</h2>
+      <ul class="lista" id="perfil-historial"></ul>
+      <h2>Récords</h2>
+      <ul class="lista" id="perfil-records"></ul>
+      <nav class="enlaces"><button class="enlace" data-ir="menu" type="button">Volver al menú</button></nav>
+    </section>
+
+    <!-- US-022: ranking -->
+    <section class="pantalla" id="pantalla-ranking" hidden>
+      <h1>Ranking global</h1>
+      <ol class="ranking" id="ranking-lista"></ol>
+      <nav class="enlaces"><button class="enlace" data-ir="menu" type="button">Volver al menú</button></nav>
+    </section>
+
+    <!-- US-024: jugar desde el celular, conectado al servidor de partidas (puerto 8002) -->
+    <section class="pantalla" id="pantalla-jugar" hidden>
+      <!-- Paso 1: crear o unirse a una partida -->
+      <div id="juego-sala">
+        <h1>Jugar</h1>
+        <button class="boton boton--principal" id="crear-partida" type="button">Crear partida nueva</button>
+        <form id="form-unirse" class="unirse" novalidate>
+          <label>Número de partida<input name="id_partida" inputmode="numeric" pattern="[0-9]*" autocomplete="off"></label>
+          <button class="boton" type="submit">Unirme</button>
+        </form>
+        <p class="mensaje" role="status"></p>
+        <h2>Partidas esperando jugadores</h2>
+        <ul class="lista" id="partidas-abiertas"></ul>
+        <nav class="enlaces"><button class="enlace" data-ir="menu" type="button">Volver al menú</button></nav>
+      </div>
+
+      <!-- Paso 2: esperar a los demás jugadores -->
+      <div id="juego-espera" hidden>
+        <h1>Partida <span id="espera-numero"></span></h1>
+        <p class="saludo">Pasale este número a los demás jugadores</p>
+        <ul class="lista" id="espera-jugadores"></ul>
+        <p class="mensaje" role="status"></p>
+        <button class="boton boton--principal" id="iniciar-partida" type="button">Iniciar partida</button>
+        <nav class="enlaces"><button class="enlace" id="salir-espera" type="button">Salir</button></nav>
+      </div>
+
+      <!-- Paso 3: la arena -->
+      <div id="juego-arena" hidden>
+        <div class="hud">
+          <span>Tiempo <b id="hud-tiempo">--</b></span>
+          <span>Meta <b id="hud-meta">--</b></span>
+          <span>Reactor <b id="hud-reactor">--</b></span>
+        </div>
+        <canvas id="arena" aria-label="Mapa de la partida"></canvas>
+        <p class="aviso-juego" id="aviso-juego" role="status"></p>
+        <div class="controles">
+          <div class="cruceta">
+            <button class="flecha flecha--arriba" data-direccion="ARRIBA" type="button" aria-label="Arriba">▲</button>
+            <button class="flecha flecha--izquierda" data-direccion="IZQUIERDA" type="button" aria-label="Izquierda">◀</button>
+            <button class="flecha flecha--derecha" data-direccion="DERECHA" type="button" aria-label="Derecha">▶</button>
+            <button class="flecha flecha--abajo" data-direccion="ABAJO" type="button" aria-label="Abajo">▼</button>
+          </div>
+          <button class="extraer" id="extraer" type="button">MANTENER<br>PARA<br>EXTRAER</button>
+        </div>
+        <ol class="ranking ranking--juego" id="marcador"></ol>
+      </div>
+
+      <!-- Paso 4: resultados -->
+      <div id="juego-fin" hidden>
+        <h1>Resultados</h1>
+        <p class="saludo" id="fin-motivo"></p>
+        <ol class="ranking" id="fin-resultados"></ol>
+        <button class="boton boton--principal" id="jugar-otra" type="button">Jugar otra partida</button>
+        <nav class="enlaces"><button class="enlace" data-ir="menu" type="button">Volver al menú</button></nav>
+      </div>
+    </section>
+
+    <p class="cargando" id="cargando" hidden>Cargando…</p>
+  </main>
+  <script src="app.js"></script>
+  <script src="juego.js"></script>
+</body>
+</html>
