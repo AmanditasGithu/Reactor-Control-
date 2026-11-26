@@ -2,8 +2,11 @@
 
 Para probar:  python juego.py   (con el backend encendido)
 """
+import json
+import os
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import pygame
@@ -15,7 +18,7 @@ from pantallas_menu import ejecutar_menu
 
 
 # El juego de la arena (mapa, guardianes y ceremonia) está en la carpeta principal del repo
-RUTA_JUEGO = Path(__file__).resolve().parent.parent / "Logica_ReactorControl.py"
+RUTA_JUEGO = Path(__file__).resolve().parent.parent / "Arenas" / "Logica_ReactorControl.py"
 
 
 def iniciar_partida(ventana, cliente: ClienteAPI, jugador: dict):
@@ -29,11 +32,39 @@ def iniciar_partida(ventana, cliente: ClienteAPI, jugador: dict):
         return ventana
 
     tamano = ventana.get_size()
+    # La arena escribe aquí cada partida que termina, para guardarla después en el ranking
+    archivo = Path(tempfile.gettempdir()) / f"reactor_resultados_{os.getpid()}.jsonl"
+    archivo.unlink(missing_ok=True)
+    entorno = dict(os.environ, REACTOR_ARCHIVO_RESULTADO=str(archivo),
+                   REACTOR_NOMBRE_JUGADOR=str(jugador.get("nombre_usuario", "")))
     pygame.display.iconify()  # minimiza el menú mientras se juega
-    subprocess.run([sys.executable, str(RUTA_JUEGO)], cwd=RUTA_JUEGO.parent)
+    subprocess.run([sys.executable, str(RUTA_JUEGO)], cwd=RUTA_JUEGO.parent, env=entorno)
     ventana = pygame.display.set_mode(tamano)  # vuelve a mostrar el menú
     pygame.event.clear()  # descarta las teclas presionadas durante el juego
+    mensaje = guardar_resultados(cliente, archivo)
+    if mensaje:
+        mostrar_aviso(ventana, mensaje)
     return ventana
+
+
+def guardar_resultados(cliente: ClienteAPI, archivo: Path) -> str | None:
+    """Manda al backend las partidas que terminaron, para el perfil y el ranking."""
+    if not archivo.exists():
+        return None  # salió antes de terminar una partida
+    guardadas, puntos, fallos = 0, 0, 0
+    for linea in archivo.read_text(encoding="utf-8").splitlines():
+        try:
+            datos = json.loads(linea)
+            cliente.guardar_partida_local(datos)
+            guardadas += 1
+            puntos += int(datos.get("puntos", 0))
+        except Exception:  # sin conexión, sesión vencida o línea dañada
+            fallos += 1
+    archivo.unlink(missing_ok=True)
+    if fallos and not guardadas:
+        return "No se pudo guardar la partida en el ranking"
+    texto = f"Partida guardada: +{puntos} puntos" if guardadas == 1 else f"{guardadas} partidas guardadas: +{puntos} puntos"
+    return texto + (f" ({fallos} sin guardar)" if fallos else "")
 
 
 def mostrar_aviso(ventana, mensaje: str) -> None:

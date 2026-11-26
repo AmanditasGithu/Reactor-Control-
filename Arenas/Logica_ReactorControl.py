@@ -5,6 +5,9 @@ import os #Para las imagenes
 import serial
 import time 
 import random
+import json
+import uuid
+from datetime import datetime, timedelta, timezone
 from Adapter import AdaptadorEstadoBackend
 from Eventos_Especiales import (
     FabricaEventosEscenario,
@@ -12,6 +15,42 @@ from Eventos_Especiales import (
     EventoReduccionEnergiaMilitar,
 )
 pygame.init()
+
+
+def anotar_resultado_partida(partida, jugador_logico, motivo, ahora):
+    """Perfil y ranking: deja el resultado de la partida para que el menú lo guarde en el backend.
+
+    El menú (frontend/juego.py) indica el archivo en REACTOR_ARCHIVO_RESULTADO.
+    Si el juego se abrió solo, sin el menú, no se guarda nada.
+    """
+    archivo = os.getenv("REACTOR_ARCHIVO_RESULTADO")
+    if not archivo:
+        return
+    duracion = int(getattr(partida, "duracion", 180) or 180)
+    meta = int(getattr(partida, "meta", 100) or 100)
+    puntos = max(0, int(jugador_logico.puntos))
+    try:
+        jugado = max(1, int(duracion - partida.tiempo_restante(ahora)))
+    except Exception:
+        jugado = duracion
+    if motivo != "GUARDIANES":
+        motivo = "PUNTUACION" if puntos >= meta else "TIEMPO"
+    fin = datetime.now(timezone.utc)
+    datos = {
+        "id_externo": uuid.uuid4().hex,
+        "escenario": escenario_actual,
+        "inicio_utc": (fin - timedelta(seconds=jugado)).isoformat(),
+        "fin_utc": fin.isoformat(),
+        "duracion_segundos": duracion,
+        "puntuacion_objetivo": meta,
+        "motivo_fin": motivo,
+        "puntos": puntos,
+    }
+    try:
+        with open(archivo, "a", encoding="utf-8") as salida:
+            salida.write(json.dumps(datos) + "\n")
+    except OSError as error:
+        print(f"No se pudo anotar el resultado: {error}")
 
 
 #Prototipo de usuario jugador (no prestarle tanta atención por fis)
@@ -1417,6 +1456,7 @@ while True:
                             key=lambda j: (-j.puntos, j.id_jugador),
                         )
                     ]
+                anotar_resultado_partida(partida, jugador_logico, motivo_game_over, ahora)  # perfil y ranking
                 motivo_game_over = None
                 sonido_victoria_reproducido = False
                 estado_juego = "VICTORIA"
@@ -1458,6 +1498,14 @@ while True:
             resultados_enriquecidos
         )
         ceremonia_victoria(ventana, ganador_adaptado, stats_adaptados, ahora)
+
+        # Cómo salir de esta pantalla (la partida ya quedó anotada para el ranking)
+        fuente_salida = pygame.font.SysFont("Arial", 18, bold=True)
+        texto_salida = fuente_salida.render("ESC: volver al menú  |  M: otro escenario", True, (255, 255, 255))
+        caja_salida = texto_salida.get_rect(bottomright=(ventana.get_width() - 16, ventana.get_height() - 14)).inflate(20, 12)
+        pygame.draw.rect(ventana, (15, 20, 30), caja_salida, border_radius=6)
+        pygame.draw.rect(ventana, (255, 215, 0), caja_salida, 2, border_radius=6)
+        ventana.blit(texto_salida, texto_salida.get_rect(center=caja_salida.center))
 
         if not sonido_victoria_reproducido:
             sonido_victoria_reproducido = True

@@ -8,13 +8,16 @@ import juego
 
 def test_jugar_abre_el_juego_de_la_arena(ventana, monkeypatch):
     llamadas = []
-    monkeypatch.setattr(juego.subprocess, "run", lambda comando, cwd: llamadas.append((comando, cwd)))
+    monkeypatch.setattr(juego.subprocess, "run",
+                        lambda comando, cwd, env: llamadas.append((comando, cwd, env)))
 
     nueva = juego.iniciar_partida(ventana, cliente=None, jugador={"nombre_usuario": "ana_07"})
 
-    comando, carpeta = llamadas[0]
+    comando, carpeta, entorno = llamadas[0]
     assert comando == [sys.executable, str(juego.RUTA_JUEGO)]
     assert carpeta == juego.RUTA_JUEGO.parent
+    # la arena sabe dónde anotar el resultado para guardarlo en el ranking
+    assert entorno["REACTOR_ARCHIVO_RESULTADO"].endswith(".jsonl")
     assert nueva.get_size() == (900, 700)  # el menú vuelve con el mismo tamaño
 
 

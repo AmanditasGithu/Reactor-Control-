@@ -259,3 +259,27 @@ class DetallePartidaResponse(BaseModel):
     motivo_fin: str | None
     ganador_id: int | None
     participantes: list[ResultadoParticipanteResponse]
+
+
+class PartidaLocalEntrante(BaseModel):
+    """Partida jugada en el juego de la compu (arena de Pygame), sin servidor de partidas.
+
+    La manda el propio juego con el token del jugador que inició sesión, así que solo
+    puede guardar puntos para esa cuenta.
+    """
+    id_externo: str = Field(pattern=r"^[0-9a-f]{32}$")
+    escenario: str = Field(default="planta_industrial", min_length=1, max_length=50)
+    inicio_utc: datetime
+    fin_utc: datetime
+    duracion_segundos: int = Field(gt=0, le=3600)
+    puntuacion_objetivo: int = Field(gt=0, le=10000)
+    motivo_fin: Literal["TIEMPO", "PUNTUACION", "GUARDIANES"]
+    puntos: int = Field(ge=0, le=10000)
+
+    @model_validator(mode="after")
+    def validar_fechas(self):
+        if self.inicio_utc.tzinfo is None or self.fin_utc.tzinfo is None:
+            raise ValueError("Las fechas deben tener zona horaria")
+        if self.fin_utc < self.inicio_utc:
+            raise ValueError("La finalización no puede preceder al inicio")
+        return self
