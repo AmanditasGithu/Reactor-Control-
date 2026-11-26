@@ -15,7 +15,7 @@ from pantallas_menu import ejecutar_menu
 
 
 # El juego de la arena (mapa, guardianes y ceremonia) está en la carpeta principal del repo
-RUTA_JUEGO = Path(__file__).resolve().parent.parent / "Logica_ReactorControl.py"
+RUTA_JUEGO = Path(__file__).resolve().parent.parent / "Arenas" / "Logica_ReactorControl.py"
 
 
 def iniciar_partida(ventana, cliente: ClienteAPI, jugador: dict):
