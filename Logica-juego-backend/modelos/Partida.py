@@ -52,6 +52,13 @@ class Partida:
         self.duracion_efecto_bonificacion = 8.0
 
         self.estado = "ESPERANDO"
+
+        # Multijugador de la arena de la compu: el mapa (reactor, terminales, lugares para
+        # bonificaciones) lo manda la arena al conectarse. Sin eso se usan los valores de arriba.
+        self.escenario = None
+        self.mapa_configurado = False
+        self.posiciones_bonificacion = None
+        self.celdas = None  # celdas de energía del mapa que todavía nadie recogió
     
     def agregar_jugador(self, jugador):
         if self.estado != "ESPERANDO":

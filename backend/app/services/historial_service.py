@@ -11,7 +11,7 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException
 
 from app.models import Jugador, Participacion, Partida, Record, ResultadoRecibido
-from app.schemas import FinalizacionEntrante
+from app.schemas import FinalizacionEntrante, PartidaLocalEntrante
 
 
 def _guardar_finalizacion(db: Session, entrada: FinalizacionEntrante) -> tuple[int, bool]:
@@ -93,3 +93,71 @@ def guardar_finalizacion(db: Session, entrada: FinalizacionEntrante) -> tuple[in
         if anterior.huella != huella:
             raise HTTPException(409, "Ese identificador ya tiene otro resultado registrado")
         return anterior.partida_id, True
+
+
+def guardar_partida_local(db: Session, jugador_id: int, entrada: PartidaLocalEntrante) -> tuple[int, bool]:
+    """Guarda una partida del juego de la compu para el jugador que inició sesión.
+
+    Suma sus puntos al perfil y al ranking y actualiza su récord. Si el juego reenvía
+    la misma partida (mismo id_externo), no se cuenta dos veces.
+    Cuenta como victoria solo si llegó a la meta de puntos.
+    """
+    huella = sha256(f"{jugador_id}:{entrada.model_dump_json()}".encode("utf-8")).hexdigest()
+
+    def ya_guardada():
+        anterior = db.get(ResultadoRecibido, entrada.id_externo)
+        if anterior is None:
+            return None
+        if anterior.huella != huella:
+            raise HTTPException(409, "Ese identificador ya tiene otro resultado registrado")
+        return anterior.partida_id, True
+
+    repetida = ya_guardada()
+    if repetida:
+        return repetida
+    jugador = db.get(Jugador, jugador_id)
+    if jugador is None:
+        raise HTTPException(404, "Jugador no encontrado")
+    gano = entrada.puntos >= entrada.puntuacion_objetivo
+    try:
+        partida = Partida(
+            estado="finalizada", escenario=entrada.escenario,
+            puntuacion_objetivo=entrada.puntuacion_objetivo,
+            duracion_segundos=entrada.duracion_segundos,
+            fecha_inicio=entrada.inicio_utc, fecha_fin=entrada.fin_utc,
+            ganador_id=jugador.id if gano else None,
+        )
+        db.add(partida)
+        db.flush()
+        db.add(Participacion(partida_id=partida.id, jugador_id=jugador.id,
+                             puntos=entrada.puntos, posicion=1))
+        jugador.puntos_totales += entrada.puntos
+        jugador.partidas_jugadas += 1
+        if gano:
+            jugador.victorias += 1
+
+        record = db.scalar(select(Record).where(
+            Record.jugador_id == jugador.id, Record.tipo == "mayor_puntuacion",
+        ))
+        if record is None:
+            db.add(Record(jugador_id=jugador.id, partida_id=partida.id,
+                          tipo="mayor_puntuacion", valor=entrada.puntos))
+        elif entrada.puntos > record.valor:
+            record.valor = entrada.puntos
+            record.partida_id = partida.id
+            record.fecha = datetime.now(timezone.utc)
+
+        db.add(ResultadoRecibido(id_externo=entrada.id_externo, partida_id=partida.id,
+                                 huella=huella, motivo_fin=entrada.motivo_fin))
+        db.commit()
+        return partida.id, False
+    except IntegrityError:
+        # Dos envíos de la misma partida al mismo tiempo: el segundo se toma como repetido
+        db.rollback()
+        repetida = ya_guardada()
+        if repetida:
+            return repetida
+        raise
+    except Exception:
+        db.rollback()
+        raise

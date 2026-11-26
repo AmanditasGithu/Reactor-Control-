@@ -3,6 +3,7 @@ import math
 
 from threading import RLock
 from modelos.Partida import Partida
+from modelos.Terminal import Terminal
 from servicios.GestorBonificaciones import GestorBonificaciones
 
 class GestordePartida:
@@ -15,9 +16,10 @@ class GestordePartida:
         self._eventos_finalizacion = []
         self.bonificaciones = GestorBonificaciones()
     
-    def crear_partida(self):
+    def crear_partida(self, escenario=None):
         with self.bloqueo:
             partida = Partida(self.siguiente_id)
+            partida.escenario = escenario
             self.partidas[self.siguiente_id] = partida
             self.siguiente_id += 1
             return partida
@@ -41,6 +43,7 @@ class GestordePartida:
             return [
                 {'id_partida': p.id_partida,
                  'estado': p.estado,
+                 'escenario': p.escenario,
                  'cantidad_jugadores': len(p.jugadores)}
                 for p in self.partidas.values()
             ]
@@ -85,6 +88,8 @@ class GestordePartida:
             'fecha_inicio_utc': partida.fecha_inicio_utc,
             'fecha_fin_utc': partida.fecha_fin_utc,
             'estado': partida.estado,
+            'escenario': partida.escenario,
+            'celdas': sorted(list(c) for c in partida.celdas) if partida.celdas is not None else None,
             'duracion': partida.duracion,
             'puntuacion_objetivo': partida.meta,
             'tiempo_restante': round(partida.tiempo_restante(ahora), 2),
@@ -165,6 +170,82 @@ class GestordePartida:
                 'estado': self._estado(partida, ahora),
             }
     
+    def configurar_mapa(self, id_partida, reactor, terminales, bonificaciones, celdas=None):
+        """Multijugador: usa las posiciones del mapa de la arena. Solo la primera vez."""
+        with self.bloqueo:
+            partida = self.partidas.get(id_partida)
+            if not partida or partida.mapa_configurado or partida.estado == 'FINALIZADA':
+                return False
+            partida.reactor.x, partida.reactor.y = int(reactor[0]), int(reactor[1])
+            if terminales:
+                partida.terminales = [
+                    Terminal(id_terminal=i, x=int(x), y=int(y), puntos=10)
+                    for i, (x, y) in enumerate(terminales[:10], 1)
+                ]
+            if bonificaciones:
+                partida.posiciones_bonificacion = [(int(x), int(y)) for x, y in bonificaciones[:60]]
+            if celdas:
+                partida.celdas = {(int(x), int(y)) for x, y in celdas[:60]}
+            partida.mapa_configurado = True
+            return True
+
+    def recoger_celda(self, id_partida, id_jugador, x, y):
+        """Celda de energía del mapa: +10 para quien la toca primero (tiene que estar al lado)."""
+        with self.bloqueo:
+            partida = self.partidas.get(id_partida)
+            if not partida or partida.estado != 'JUGANDO' or not partida.celdas:
+                return None
+            jugador = self._jugador(partida, id_jugador)
+            celda = (int(x), int(y))
+            if not jugador or celda not in partida.celdas:
+                return None
+            if abs(jugador.x - celda[0]) > 1 or abs(jugador.y - celda[1]) > 1:
+                return None
+            ahora = time.monotonic()
+            partida.celdas.discard(celda)
+            jugador.sumar_puntos(10, ahora)
+            self._verificar_fin(partida)
+            return self._estado(partida, ahora)
+
+    def ubicar_jugador(self, id_partida, id_jugador, x, y):
+        """Multijugador: la arena de la compu informa en qué casilla está su jugador.
+
+        La arena maneja las paredes; el servidor acepta pasos cortos (máximo 3 casillas)
+        para que nadie se teletransporte. La primera vez sí puede ubicarse donde empieza.
+        """
+        with self.bloqueo:
+            partida = self.partidas.get(id_partida)
+            if not partida or partida.estado != 'JUGANDO':
+                return {'ok': False}
+            self._verificar_fin(partida)
+            jugador = self._jugador(partida, id_jugador)
+            if partida.estado != 'JUGANDO' or not jugador or jugador.extrayendo:
+                return {'ok': False}
+            x, y = int(x), int(y)
+            if getattr(jugador, 'ubicado', False) and abs(x - jugador.x) + abs(y - jugador.y) > 3:
+                return {'ok': False}
+            jugador.ubicado = True
+            if (x, y) == (jugador.x, jugador.y):
+                return {'ok': True, 'cambio': False}
+            ahora = time.monotonic()
+            self.bonificaciones.actualizar(partida, ahora)
+            jugador.x, jugador.y = x, y
+            bonificacion_recogida = self.bonificaciones.intentar_recoger(partida, jugador, ahora)
+            terminal_activada = None
+            for terminal in partida.terminales:
+                puntos_antes = jugador.puntos
+                if terminal.activar(jugador, ahora=ahora):
+                    terminal_activada = {
+                        'id_terminal': terminal.id_terminal,
+                        'id_jugador': jugador.id_jugador,
+                        'puntos_obtenidos': jugador.puntos - puntos_antes,
+                    }
+                    break
+            self._verificar_fin(partida)
+            return {'ok': True, 'cambio': True, 'terminal_activada': terminal_activada,
+                    'bonificacion_recogida': bonificacion_recogida,
+                    'estado': self._estado(partida, ahora)}
+
     def mover_jugador(self, id_partida, id_jugador, direccion):
         resultado = self.mover_jugador_detallado(
             id_partida, id_jugador, direccion

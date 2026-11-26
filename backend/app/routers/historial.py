@@ -10,11 +10,11 @@ from app.database import get_db
 from app.dependencias import get_jugador_actual
 from app.models import Jugador, Participacion, Partida, Record, ResultadoRecibido
 from app.schemas import (
-    DetallePartidaResponse, FinalizacionEntrante, HistorialFilaResponse,
+    DetallePartidaResponse, FinalizacionEntrante, HistorialFilaResponse, PartidaLocalEntrante,
     HistorialPaginadoResponse, RecordResponse, ResultadoGuardadoResponse,
     ResultadoParticipanteResponse,
 )
-from app.services.historial_service import guardar_finalizacion
+from app.services.historial_service import guardar_finalizacion, guardar_partida_local
 
 router = APIRouter(prefix="/api", tags=["Historial y récords - US-023"])
 
@@ -32,6 +32,17 @@ def registrar_finalizacion(
     if not x_reactor_servicio or not hmac.compare_digest(x_reactor_servicio, secreto):
         raise HTTPException(403, "Servicio no autorizado")
     partida_id, duplicado = guardar_finalizacion(db, entrada)
+    return ResultadoGuardadoResponse(partida_id=partida_id, duplicado=duplicado)
+
+
+@router.post("/partidas/local", response_model=ResultadoGuardadoResponse)
+def registrar_partida_local(
+    entrada: PartidaLocalEntrante,
+    jugador: Jugador = Depends(get_jugador_actual),
+    db: Session = Depends(get_db),
+):
+    """El juego de la compu guarda la partida del jugador que inició sesión (perfil y ranking)."""
+    partida_id, duplicado = guardar_partida_local(db, jugador.id, entrada)
     return ResultadoGuardadoResponse(partida_id=partida_id, duplicado=duplicado)
 
 

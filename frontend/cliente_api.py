@@ -143,6 +143,10 @@ class ClienteAPI:
         """US-023: mejores marcas guardadas del usuario."""
         return self._enviar("GET", "/api/records")
 
+    def guardar_partida_local(self, datos: dict) -> dict:
+        """Guarda en el perfil y el ranking una partida jugada en la arena de la compu."""
+        return self._enviar("POST", "/api/partidas/local", datos)
+
     def cerrar_sesion(self) -> None:
         """Olvida el token. El jugador tiene que volver a iniciar sesión."""
         self.token = None
